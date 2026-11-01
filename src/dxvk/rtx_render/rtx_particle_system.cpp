@@ -406,16 +406,17 @@ namespace dxvk {
       int on = 0;
       float v[9] = {};
       if (sscanf(carBox.c_str(), "%d %f %f %f %f %f %f %f %f %f", &on, &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8]) == 10 && on == 1) {
-        const vec3 up = constants.upDirection;
-        vec3 f = vec3(v[3], v[4], v[5]);
+        // Host-side math in dxvk's Vector3 (vec3 is the shader-shared storage type, without operators)
+        const Vector3 up(constants.upDirection.x, constants.upDirection.y, constants.upDirection.z);
+        Vector3 f(v[3], v[4], v[5]);
         f = f - up * dot(f, up);
         const float len = length(f);
         if (len > 1e-4f && v[6] > 0.f && v[7] > 0.f && v[8] > 0.f) {
           f = f / len;
-          const vec3 s = cross(up, f);
+          const Vector3 s = cross(up, f);
           constants.killBoxCenter = vec3(v[0], v[1], v[2]);
-          constants.killBoxAxisF = f;
-          constants.killBoxAxisS = s;
+          constants.killBoxAxisF = vec3(f.x, f.y, f.z);
+          constants.killBoxAxisS = vec3(s.x, s.y, s.z);
           constants.killBoxHalfLength = v[6];
           constants.killBoxHalfWidth = v[7];
           constants.killBoxHalfHeight = v[8];
