@@ -32,6 +32,11 @@ Entry format:
 
 The New Vegas RTX runtime is Remix Plus with the additions below, which the Fallout: New Vegas integration uses. The dated entries after this section are the Remix Plus trunk's, and this runtime shares only part of that history. It does not have the trunk's frontend interface rework (interface steps I1 to I6f), the input checks at the scene interface, game lights, external frame export, neural uplift or the stress mode.
 
+### GPU device loss when a BLAS drops an opacity micromap in flight (upstream d6d005566)
+Rebuilding or releasing a BLAS let go of the micromaps it held while an earlier frame's TLAS could still be traced through them (page fault, device loss). Those micromaps now stay alive until the current command list completes.
+- Options: none.
+- Commits: cherry-picked from upstream d6d005566.
+
 ### Particle spawns no longer pile up while ray tracing is off
 Spawns queued during frames without ray tracing carried stale instance indices into the next ray traced frame, which sent particles off to infinity and could hang the GPU. Spawns older than one frame are now dropped.
 - Options: none.
