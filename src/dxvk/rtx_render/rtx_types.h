@@ -720,6 +720,7 @@ enum class InstanceCategories : uint32_t {
   ParticleEmitter,
   SmoothNormals,
   HairCards,
+  CardNormals, // RBR-RTX (port of xoxor4d e9322b7c): bent normal per hit for flat foliage cards
 
   Count,
 };

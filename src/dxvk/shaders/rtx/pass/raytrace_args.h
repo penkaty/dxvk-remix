@@ -570,6 +570,8 @@ struct RaytraceArgs {
   // rtx.resolveKeepsCoplanarSurfaces. 1 = a ray query resolve iteration after a cut-out texel skips only the
   // triangle passed instead of starting behind its plane (resolve_expanded.slangh).
   uint resolveKeepsCoplanarSurfaces;
+  // RBR-RTX: rtx.cardNormals.upWeight for CardNormals surfaces (surface_interaction.slangh).
+  float cardNormalsUpWeight;
 
   // NOTE: Add structs to the top section of RaytraceArgs, not the bottom.
   // NOTE: bool does not work in debug builds, use uint instead.

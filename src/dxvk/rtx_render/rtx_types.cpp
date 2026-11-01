@@ -403,6 +403,7 @@ namespace dxvk {
 
     setIf(InstanceCategories::Particle, lookupHash(RtxOptions::particleTextures(), textureHash));
     setIf(InstanceCategories::Beam, lookupHash(RtxOptions::beamTextures(), textureHash));
+    setIf(InstanceCategories::CardNormals, lookupHash(RtxOptions::cardNormalsTextures(), textureHash));
 
     setIf(InstanceCategories::DecalStatic, lookupHash(RtxOptions::decalTextures(), textureHash));
     setIf(InstanceCategories::DecalDynamic, lookupHash(RtxOptions::dynamicDecalTextures(), textureHash));

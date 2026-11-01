@@ -122,6 +122,7 @@ namespace fork_hooks {
       applyCategory(RtxOptions::worldSpaceUiBackgroundTextures(), InstanceCategories::WorldMatte);
       applyCategory(RtxOptions::particleTextures(), InstanceCategories::Particle);
       applyCategory(RtxOptions::beamTextures(), InstanceCategories::Beam);
+      applyCategory(RtxOptions::cardNormalsTextures(), InstanceCategories::CardNormals);
       applyCategory(RtxOptions::decalTextures(), InstanceCategories::DecalStatic);
       applyCategory(RtxOptions::terrainTextures(), InstanceCategories::Terrain);
       applyCategory(RtxOptions::animatedWaterTextures(), InstanceCategories::AnimatedWater);

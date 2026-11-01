@@ -325,6 +325,11 @@ namespace dxvk {
                   "Textures on draw calls whose geometry should have smooth normals generated on the GPU.\n"
                   "This is useful for older D3D9 games where the geometry may be missing smooth normals, especially when using the VertexShader Capture mechanism.\n"
                   "When a draw call matches, area-weighted smooth normals will be computed from the triangle mesh and used for ray tracing.");
+    // RBR-RTX: port of xoxor4d's CardNormals (dxvk-remix game/gta4 e9322b7c), also for draws without a normal buffer.
+    RTX_OPTION("rtx", fast_unordered_set, cardNormalsTextures, {},
+                  "Objects rendered with these textures are shaded with a bent normal instead of their vertex normals: per hit, the direction from the card's center (the midpoint of the triangle's longest edge) to the hit point, mixed with world up by rtx.cardNormals.upWeight.
+"
+                  "Meant for flat foliage cards, which otherwise shade as flat planes (one side lit, one black). The normal lies in the card plane, so both sides of a card shade the same.");
     
   public:
     RTX_OPTION("rtx", bool, showRaytracingOption, true, "Enables or disables the option to toggle ray tracing in the UI. When set to false the ray tracing checkbox will not appear in the Remix UI.");
@@ -487,6 +492,11 @@ namespace dxvk {
       RTX_OPTION("rtx.playerModel", float, intersectionCapsuleRadius, 24.f, "");
       RTX_OPTION("rtx.playerModel", float, intersectionCapsuleHeight, 68.f, "");
     } playerModel;
+
+    struct CardNormals {
+      RTX_OPTION("rtx.cardNormals", float, upWeight, 0.5f,
+                 "How much the bent normal of rtx.cardNormalsTextures surfaces leans toward world up (0: radial from the card center, 1: straight up).");
+    };
 
     struct Displacement {
       friend class ImGUI;

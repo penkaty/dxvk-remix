@@ -56,6 +56,7 @@ namespace dxvk {
     { "remix_category:particle_emitter",          "Particle Emitter",          "rtx.particleEmitterTextures" },
     { "remix_category:smooth_normals",            "Smooth Normals",            "rtx.smoothNormalsTextures" },
     { "remix_category:hair_cards",                "Hair Cards",                "rtx.hairCardTextures" },
+    { "remix_category:card_normals",              "Card Normals",              "rtx.cardNormalsTextures" },
   };
   // NV-DXVK end
 }

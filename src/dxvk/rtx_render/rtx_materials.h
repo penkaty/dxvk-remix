@@ -136,6 +136,7 @@ struct RtSurface {
     uint16_t flags0 = 0;
     flags0 |= normalFormat == VK_FORMAT_R32_UINT ? 1 : 0;
     flags0 |= isVertexColorBakedLighting ? (1 << 1) : 0;
+    flags0 |= useCardNormals ? (1 << 2) : 0;   // RBR-RTX: CardNormals category (surface.h useCardNormals)
     // NOTE: Spare flags bits here
 
     writeGPUHelper(data, offset, flags0);
@@ -357,6 +358,7 @@ struct RtSurface {
   bool isClipPlaneEnabled = false;
   bool isTextureFactorBlend = false;
   bool isVertexColorBakedLighting = true;
+  bool useCardNormals = false;           // RBR-RTX: InstanceCategories::CardNormals
   bool isMotionBlurMaskOut = false;
   bool skipSurfaceInteractionSpritesheetAdjustment = false;
 
