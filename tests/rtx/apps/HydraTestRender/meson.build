@@ -118,6 +118,8 @@ hdremix_test_exe = executable(
   include_directories: hdremix_includes,
   cpp_args: hdremix_defines + hdremix_compilerflags,
   dependencies: hdremix_linklibs + hdremix_dxvksdkbuilt + usd_plugin_deps + lib_glfw3,
+  # RBR-RTX: packman's glfw3.lib is built against the static CRT (LNK4098 LIBCMT, fatal under werror); test app only.
+  link_args: ['/IGNORE:4098'],
   override_options: ['cpp_std=c++17'],
   install: true,
   install_dir: hdremix_outdir,
