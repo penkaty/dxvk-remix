@@ -20,6 +20,11 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+// RBR-RTX: this file defines the remixapi_* entry points it hands out (GetUIState / SetUIState stubs below), so
+// remix_c.h must declare them dllexport here, not dllimport: MSVC 14.44 x86 refused to link otherwise (LNK4217 under
+// werror: "_remixapi_GetUIState@0 defined in remix_api.cpp.obj is imported by remix_api.cpp.obj").
+#define REMIX_LIBRARY_EXPORTS
+
 #include <cmath>
 #include <cstring>
 #include <mutex>
