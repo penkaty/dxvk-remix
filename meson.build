@@ -101,6 +101,8 @@ if dxvk_is_msvc
     add_global_link_arguments('/DEBUG', language : 'cpp')
     add_global_link_arguments('/OPT:REF', language : 'cpp')
     add_global_link_arguments('/OPT:ICF', language : 'cpp')
+    # RBR-RTX: packman's sentry.lib comes without sentry.pdb; LNK4099 (no debug info for it) is fatal under werror.
+    add_global_link_arguments('/IGNORE:4099', language : 'cpp')
   endif
 endif
 
