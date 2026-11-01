@@ -572,6 +572,8 @@ struct RaytraceArgs {
   uint resolveKeepsCoplanarSurfaces;
   // RBR-RTX: rtx.cardNormals.upWeight for CardNormals surfaces (surface_interaction.slangh).
   float cardNormalsUpWeight;
+  // RBR-RTX: rtx.cardNormalsKeepGeometryNormal (1: the card normal shades only, the geometry normal stays the triangle's).
+  uint cardNormalsKeepGeometryNormal;
 
   // NOTE: Add structs to the top section of RaytraceArgs, not the bottom.
   // NOTE: bool does not work in debug builds, use uint instead.

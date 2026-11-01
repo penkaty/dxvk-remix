@@ -855,6 +855,7 @@ namespace dxvk {
           RemixGui::DragFloat("Hair Cards Mip Bias", &RtxOptions::hairCardMipBiasObject(), 0.25f, -32.0f, 16.0f, "%.2f", sliderFlags);
           RemixGui::DragFloat("Hair Cards Roughness Scale", &RtxOptions::hairCardRoughnessScaleObject(), 0.01f, 0.0f, 4.0f, "%.3f", sliderFlags);
           RemixGui::DragFloat("Card Normals Up Weight", &RtxOptions::CardNormals::upWeightObject(), 0.01f, 0.0f, 1.0f, "%.2f", sliderFlags);
+          RemixGui::Checkbox("Card Normals Keep Geometry Normal", &RtxOptions::CardNormals::cardNormalsKeepGeometryNormalObject());
           RemixGui::SliderFloat("Normal Strength##1", &OpaqueMaterialOptions::normalIntensityObject(), -10.0f, 10.f, "%.3f", sliderFlags);
 
           RemixGui::Checkbox("Enable dual-layer animated water normal for Opaque", &OpaqueMaterialOptions::layeredWaterNormalEnableObject());

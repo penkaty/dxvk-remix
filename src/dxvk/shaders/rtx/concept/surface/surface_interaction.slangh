@@ -441,14 +441,28 @@ SurfaceInteraction surfaceInteractionCreate<let GenerateTangents : bool>(
   // The smooth base surface of the vertex normals for SCCR, 0 without them (sccrPhongEdgeCurvature).
   vec4 sccrEdgeCurvature = vec4(0.0f);
 
+  // RBR-RTX: the card-derived shading base normal; only meaningful when hasCardShadingNormal (else geometryNormal is the base).
+  vec3 cardShadingNormal = vec3(0.0f);
+  bool hasCardShadingNormal = false;
+
   if (surface.normalBufferIndex == BINDING_INDEX_INVALID)
   {
     surfaceInteraction.geometryNormal = flippedTriangleNormal;
     // RBR-RTX: RBR's fixed-function foliage has no normal stream; CardNormals applies here too (xoxor4d's does not).
     if (surface.useCardNormals)
     {
-      surfaceInteraction.geometryNormal =
+      const vec3 cardBentNormal =
         getBentNormal(flippedTriangleNormal, calcCardNormal(worldPositions, hitPosition, flippedTriangleNormal), ray.direction);
+      if (cb.cardNormalsKeepGeometryNormal != 0)
+      {
+        // The card normal lies in the card plane: it must only shade, never offset rays (geometryNormal stays the triangle's).
+        cardShadingNormal = cardBentNormal;
+        hasCardShadingNormal = true;
+      }
+      else
+      {
+        surfaceInteraction.geometryNormal = cardBentNormal;
+      }
     }
   }
   else
@@ -508,9 +522,20 @@ SurfaceInteraction surfaceInteractionCreate<let GenerateTangents : bool>(
     vec3 interpolatedNormal = safeNormalize(interpolateHitAttribute(normals, bary), triangleNormal);
     sccrEdgeCurvature = sccrPhongEdgeCurvature(worldPositions, normals, flippedTriangleNormal);
 
-    if (surface.useCardNormals)   // RBR-RTX: CardNormals category
+    // RBR-RTX: CardNormals category. The real vertex normal is kept for the geometry normal when
+    // rtx.cardNormalsKeepGeometryNormal is on; the card normal then only becomes the shading base normal.
+    if (surface.useCardNormals)
     {
-      interpolatedNormal = calcCardNormal(worldPositions, hitPosition, triangleNormal);
+      const vec3 cardInterpolatedNormal = calcCardNormal(worldPositions, hitPosition, triangleNormal);
+      if (cb.cardNormalsKeepGeometryNormal != 0)
+      {
+        cardShadingNormal = getBentNormal(flippedTriangleNormal, cardInterpolatedNormal, ray.direction);
+        hasCardShadingNormal = true;
+      }
+      else
+      {
+        interpolatedNormal = cardInterpolatedNormal;
+      }
     }
 
 #ifdef GBUFFER_FEATURE_DEBUG_VIEW
@@ -785,6 +810,9 @@ SurfaceInteraction surfaceInteractionCreate<let GenerateTangents : bool>(
     surfaceInteraction.geometryBitangent     = ebitangent;
     surfaceInteraction.rawBitangent          = ebitangent;
   }
+
+  // RBR-RTX: the shading base normal is the geometry normal except for CardNormals surfaces that keep the triangle normal.
+  surfaceInteraction.shadingBaseNormal = hasCardShadingNormal ? cardShadingNormal : surfaceInteraction.geometryNormal;
 
   // Adjust texture coordinates and gradients for animated sprite sheet logic
 

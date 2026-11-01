@@ -3805,6 +3805,7 @@ uint geometryPSRPreparePass(ivec2 pixelCoordinate) {
   surfaceInteraction.positionError = minimalSurfaceInteraction.positionError;
   surfaceInteraction.shadowTerminatorOffset = minimalSurfaceInteraction.shadowTerminatorOffset;
   surfaceInteraction.geometryNormal = minimalSurfaceInteraction.geometryNormal;
+  surfaceInteraction.shadingBaseNormal = minimalSurfaceInteraction.geometryNormal;   // RBR-RTX
   surfaceInteraction.geometryTangent = minimalSurfaceInteraction.geometryTangent;
   surfaceInteraction.geometryBitangent = minimalSurfaceInteraction.geometryBitangent;
 

@@ -495,6 +495,10 @@ namespace dxvk {
     struct CardNormals {
       RTX_OPTION("rtx.cardNormals", float, upWeight, 0.5f,
                  "How much the bent normal of rtx.cardNormalsTextures surfaces leans toward world up (0: radial from the card center, 1: straight up).");
+      // RBR-RTX: the card normal shades only; ray offsets, shadow rays and cut-out continuation keep the triangle normal.
+      RTX_OPTION("rtx", bool, cardNormalsKeepGeometryNormal, true,
+                 "CardNormals: keep the triangle normal as the geometry normal (ray offsets, shadow rays, cut-out continuation); the card normal shades only. "
+                 "False = the card normal also bends the geometry normal (the original port).");
     };
 
     struct Displacement {

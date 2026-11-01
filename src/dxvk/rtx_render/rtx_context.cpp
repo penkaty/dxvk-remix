@@ -2276,6 +2276,7 @@ namespace dxvk {
     constants.isLastCompositeOutputValid = restirGI.isActive() && restirGI.getLastCompositeOutput().matchesWriteFrameIdx(frameIdx - 1);
     constants.isZUp = RtxOptions::zUp();
     constants.cardNormalsUpWeight = RtxOptions::CardNormals::upWeight();
+    constants.cardNormalsKeepGeometryNormal = RtxOptions::CardNormals::cardNormalsKeepGeometryNormal() ? 1 : 0;
     constants.enableCullingSecondaryRays = RtxOptions::enableCullingInSecondaryRays();
 
     constants.domeLightArgs = getSceneManager().getLightManager().getDomeLightArgs();

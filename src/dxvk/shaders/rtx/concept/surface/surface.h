@@ -540,6 +540,10 @@ struct SurfaceInteraction : MinimalSurfaceInteraction
 #endif
 #endif
 
+  // RBR-RTX: base of the shading normal (normal maps perturb it; opaque_surface_material_interaction.slangh). Equals
+  // geometryNormal except on CardNormals surfaces with rtx.cardNormalsKeepGeometryNormal, where it is the card's bent
+  // normal while geometryNormal stays the triangle's (ray offsets, shadow rays, cut-out continuation use that).
+  vec3 shadingBaseNormal = 0.f;
   vec3 motion = 0..xxx;
   vec2 textureCoordinates = 0..xx;
   vec2 textureGradientX = 0..xx;

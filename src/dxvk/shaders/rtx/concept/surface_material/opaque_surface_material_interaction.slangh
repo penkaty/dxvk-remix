@@ -1058,6 +1058,23 @@ OpaqueSurfaceMaterialInteraction opaqueSurfaceMaterialInteractionCreate(
 
   const f16mat3 worldToTangent = f16mat3(surfaceInteraction.geometryTangent, surfaceInteraction.geometryBitangent, surfaceInteraction.geometryNormal);
 
+  // RBR-RTX: CardNormals with rtx.cardNormalsKeepGeometryNormal: the card's bent normal is the base of the shading
+  // normal (normal maps perturb it) while geometryNormal stays the triangle's. The tangent frame is re-orthogonalised
+  // against it (Gram-Schmidt, handedness kept) for the normal map decode below. Other surfaces: unchanged.
+  const bool useShadingBase = surface.useCardNormals && cb.cardNormalsKeepGeometryNormal != 0;
+  const vec3 shadingBase = useShadingBase ? surfaceInteraction.shadingBaseNormal : surfaceInteraction.geometryNormal;
+  f16mat3 shadingWorldToTangent = worldToTangent;
+  if (useShadingBase)
+  {
+    const vec3 geoT = surfaceInteraction.geometryTangent;
+    const vec3 geoB = surfaceInteraction.geometryBitangent;
+    const float handedness = dot(cross(geoT, geoB), surfaceInteraction.geometryNormal) < 0.0f ? -1.0f : 1.0f;
+    const vec3 fallbackT = abs(shadingBase.y) < 0.99f ? vec3(0.0f, 1.0f, 0.0f) : vec3(1.0f, 0.0f, 0.0f);
+    const vec3 shadingT = safeNormalize(geoT - dot(geoT, shadingBase) * shadingBase, safeNormalize(cross(fallbackT, shadingBase), vec3(1.0f, 0.0f, 0.0f)));
+    const vec3 shadingB = cross(shadingBase, shadingT) * handedness;
+    shadingWorldToTangent = f16mat3(shadingT, shadingB, shadingBase);
+  }
+
   // Note: Does not represent if the thin film is enabled in all cases, such as if the thin film enable override is specified, merely concerned with if
   // it has been directly enabled by the material itself.
   const bool thinFilmEnabled = opaqueSurfaceMaterial.flags & OPAQUE_SURFACE_MATERIAL_FLAG_USE_THIN_FILM_LAYER;
@@ -1238,7 +1255,7 @@ OpaqueSurfaceMaterialInteraction opaqueSurfaceMaterialInteractionCreate(
 
   // Load Normal
 
-  vec3 normal = surfaceInteraction.geometryNormal;
+  vec3 normal = shadingBase;   // RBR-RTX: was surfaceInteraction.geometryNormal
   // Note: Defaults to 0 as this indicates no normal detail (which should be the case when a normal map is not present).
   float normalDetail = 0.0f;
 
@@ -1248,7 +1265,7 @@ OpaqueSurfaceMaterialInteraction opaqueSurfaceMaterialInteractionCreate(
   if (terrainLayersActive)
   {
     // Blended terrain-layer normal replaces the base normal map.
-    const f16mat3 tangentToWorld = transpose(worldToTangent);
+    const f16mat3 tangentToWorld = transpose(shadingWorldToTangent);   // RBR-RTX: shadingWorldToTangent == worldToTangent off cards
     normal = normalize(mul(tangentToWorld, terrainTangentNormal));
     normalDetail = 1.0f - terrainTangentNormal.z;
   }
@@ -1272,7 +1289,7 @@ OpaqueSurfaceMaterialInteraction opaqueSurfaceMaterialInteractionCreate(
           : unsignedOctahedralToHemisphereDirection(vec2(normalSample.xy), cb.opaqueMaterialArgs.normalIntensity);
     }
     
-    const f16mat3 tangentToWorld = transpose(worldToTangent);
+    const f16mat3 tangentToWorld = transpose(shadingWorldToTangent);   // RBR-RTX: shadingWorldToTangent == worldToTangent off cards
 
     normal = normalize(mul(tangentToWorld, tangentNormal));
 
