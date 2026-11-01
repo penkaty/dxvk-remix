@@ -168,6 +168,16 @@ void evolve(inout GpuParticle particle, const GpuParticleSystem particleSystem)
   particle.velocity = select(maxVelocity > 0.h, clamp(particle.velocity, -maxVelocity, maxVelocity), particle.velocity);
   
   particle.position += particle.velocity * particleCb.deltaTimeSecs;
+
+  // RBR-RTX: the player's car as a per-frame kill volume. The spawn-time shelter and landing traces run against last
+  // frame's scene, so a moving car drives into drops they judged free; testing the current box here fixes that.
+  if (particleSystem.desc.killInCarBox && particleCb.killBoxEnabled != 0u
+      && insideCarKillBox(particle.position, particleCb.killBoxCenter, particleCb.killBoxAxisF, particleCb.killBoxAxisS,
+                          particleCb.upDirection, float3(particleCb.killBoxHalfLength, particleCb.killBoxHalfWidth, particleCb.killBoxHalfHeight)))
+  {
+    particle.velocity = 0..xxx;
+    particle.timeToLive = 0.f;
+  }
   
   if (!particleSystem.desc.enableMotionTrail)
   {

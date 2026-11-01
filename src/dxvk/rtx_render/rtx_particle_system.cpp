@@ -28,6 +28,7 @@
 #include "dxvk_context.h"
 #include "rtx_context.h"
 #include "rtx_fork_hooks.h"
+#include "rtx_fork_game_state.h"
 #include "rtx_imgui.h"
 
 #include "../util/util_global_time.h"
@@ -390,6 +391,38 @@ namespace dxvk {
     // test. It is null for the first frames of a scene.
     constants.sceneTlasValid =
       ctx->getResourceManager().getTLAS(Tlas::Opaque).accelStructure.ptr() != nullptr ? 1u : 0u;
+
+    // RBR-RTX car kill box: "__rbrrtx.carbox" = "1 cx cy cz fx fy fz halfLength halfWidth halfHeight" (world space, written by
+    // the host each frame through remixapi_SetGameValue); anything else, or a missing key, means no box. The length axis is
+    // flattened onto the plane perpendicular to the scene up direction; the side axis is up x length.
+    constants.killBoxEnabled = 0;
+    constants.killBoxCenter = vec3(0.f, 0.f, 0.f);
+    constants.killBoxAxisF = vec3(1.f, 0.f, 0.f);
+    constants.killBoxAxisS = vec3(0.f, 0.f, 1.f);
+    constants.killBoxHalfLength = constants.killBoxHalfWidth = constants.killBoxHalfHeight = 0.f;
+    constants.killBoxPad0 = constants.killBoxPad1 = constants.killBoxPad2 = 0;
+    std::string carBox;
+    if (fork_game_state::GameStateStore::get().tryGet("__rbrrtx.carbox", carBox)) {
+      int on = 0;
+      float v[9] = {};
+      if (sscanf(carBox.c_str(), "%d %f %f %f %f %f %f %f %f %f", &on, &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8]) == 10 && on == 1) {
+        const vec3 up = constants.upDirection;
+        vec3 f = vec3(v[3], v[4], v[5]);
+        f = f - up * dot(f, up);
+        const float len = length(f);
+        if (len > 1e-4f && v[6] > 0.f && v[7] > 0.f && v[8] > 0.f) {
+          f = f / len;
+          const vec3 s = cross(up, f);
+          constants.killBoxCenter = vec3(v[0], v[1], v[2]);
+          constants.killBoxAxisF = f;
+          constants.killBoxAxisS = s;
+          constants.killBoxHalfLength = v[6];
+          constants.killBoxHalfWidth = v[7];
+          constants.killBoxHalfHeight = v[8];
+          constants.killBoxEnabled = 1;
+        }
+      }
+    }
   }
 
   // Please re-profile performance if any of these structures change in size.  As a minimum performance requirement, always preserve a 16 byte alignment.
@@ -614,6 +647,14 @@ namespace dxvk {
   }
 
   void RtxParticleSystemManager::simulate(RtxContext* ctx) {
+    // RBR-RTX: tells hosts this runtime has the car kill box (bit 0x40 of the particle collisionMode, game value
+    // "__rbrrtx.carbox"). Set on the first frame, before any early out: a host reads it back before it creates its systems.
+    static bool s_announcedCarBox = false;
+    if (!s_announcedCarBox) {
+      fork_game_state::GameStateStore::get().set("__rbrrtx.killbox.v", "1");
+      s_announcedCarBox = true;
+    }
+
     if (!enable() || !m_initialized) {
       m_spawnContexts.clear();
       m_particleSystems.clear();

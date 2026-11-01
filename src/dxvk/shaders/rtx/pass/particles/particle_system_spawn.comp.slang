@@ -256,6 +256,14 @@ GpuParticle respawn(uint particleIdx, uint spawnCtxIdx, const GpuParticleSystem 
   GpuParticle newParticle;
   newParticle.reset(particleSystem, candidate.spawnPosition, candidate.initialVelocity, candidate.uvMinMax, candidate.color, candidate.randSeed);
 
+  // RBR-RTX: born inside the car kill box (a drop spawned over a car that moved into its column): never rendered.
+  if (particleSystem.desc.killInCarBox && particleCb.killBoxEnabled != 0u
+      && insideCarKillBox(candidate.spawnPosition, particleCb.killBoxCenter, particleCb.killBoxAxisF, particleCb.killBoxAxisS,
+                          particleCb.upDirection, float3(particleCb.killBoxHalfLength, particleCb.killBoxHalfWidth, particleCb.killBoxHalfHeight)))
+  {
+    newParticle.timeToLive = 0.0f;
+  }
+
   if (traceOcclusion)
   {
     if (sheltered)

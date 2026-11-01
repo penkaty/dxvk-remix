@@ -109,6 +109,9 @@ struct GpuParticleSystemDesc {
   // where it would hit geometry. Unlike the screen-space enableCollisionDetection, this sees
   // off-screen geometry such as roofs. Curved trajectories are only approximated by the straight ray.
   uint8_t traceSpawnOcclusion : 1;
+  // RBR-RTX: particles that enter ParticleSystemConstants::killBox* (a host-supplied oriented box, normally the player's car)
+  // are killed, at spawn and every simulation step. Not part of the API struct: bit 0x40 of collisionMode.
+  uint8_t killInCarBox : 1;
 
 // Note: Spatial fields (collisionThickness, attractorRadius, gravityForce,
   // initialVelocityFromNormal, attractorForce, turbulenceForce, turbulenceFrequency)
@@ -169,6 +172,7 @@ struct RtxParticleSystemDesc : GpuParticleSystemDesc {
     restrictVelocityY = 0;
     restrictVelocityZ = 0;
     traceSpawnOcclusion = 0;
+    killInCarBox = 0;
   }
 
   XXH64_hash_t calcHash() const {
@@ -247,4 +251,29 @@ struct ParticleSystemConstants {
   // Non-zero when topLevelAS holds last frame's acceleration structure, since simulation runs before
   // this frame's build. It is missing on a scene's first frames, and traceSpawnOcclusion is skipped then.
   uint sceneTlasValid;
+
+  // RBR-RTX car kill box (world space, metres): centre, the horizontal length axis, the horizontal side axis (up x length)
+  // and the half sizes along length, side and upDirection. Filled each frame from the game value "__rbrrtx.carbox"
+  // (rtx_particle_system.cpp); killBoxEnabled 0 = no box. Systems opt in with GpuParticleSystemDesc::killInCarBox.
+  vec3 killBoxCenter;
+  float killBoxHalfLength;
+  vec3 killBoxAxisF;
+  float killBoxHalfWidth;
+  vec3 killBoxAxisS;
+  float killBoxHalfHeight;
+  uint killBoxEnabled;
+  uint killBoxPad0;
+  uint killBoxPad1;
+  uint killBoxPad2;
 };
+
+#ifndef __cplusplus
+// RBR-RTX: true when pos lies inside the car kill box (oriented box: length, side, up axes through the centre).
+bool insideCarKillBox(float3 pos, float3 center, float3 axisF, float3 axisS, float3 up, float3 halfLenWidHeight)
+{
+  const float3 rel = pos - center;
+  return abs(dot(rel, axisF)) <= halfLenWidHeight.x
+      && abs(dot(rel, axisS)) <= halfLenWidHeight.y
+      && abs(dot(rel, up)) <= halfLenWidHeight.z;
+}
+#endif
