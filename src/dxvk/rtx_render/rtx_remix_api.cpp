@@ -1049,7 +1049,11 @@ namespace {
       desc.attractorPosition = tovec3(info.attractorPosition);
       desc.attractorForce = info.attractorForce;
       desc.spriteSheetMode = static_cast<ParticleSpriteSheetMode>(info.spriteSheetMode);
-      desc.collisionMode = static_cast<ParticleCollisionMode>(info.collisionMode);
+      // RBR-RTX: bit 0x80 of collisionMode = spawn shelter (GpuParticleSystemDesc::traceSpawnOcclusion: new particles
+      // move to open sky and die on the first opaque surface of their fall, also off screen). The API struct has no
+      // field for it and nothing else in the runtime sets it; a new field would change the bridge's serialised layout.
+      desc.traceSpawnOcclusion = (info.collisionMode & 0x80) ? 1 : 0;
+      desc.collisionMode = static_cast<ParticleCollisionMode>(info.collisionMode & 0x7F);
       desc.randomFlipAxis = static_cast<ParticleRandomFlipAxis>(info.randomFlipAxis);
       desc.restrictVelocityX = static_cast<uint8_t>(info.restrictVelocityX);
       desc.restrictVelocityY = static_cast<uint8_t>(info.restrictVelocityY);
