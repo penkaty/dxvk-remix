@@ -327,8 +327,7 @@ namespace dxvk {
                   "When a draw call matches, area-weighted smooth normals will be computed from the triangle mesh and used for ray tracing.");
     // RBR-RTX: port of xoxor4d's CardNormals (dxvk-remix game/gta4 e9322b7c), also for draws without a normal buffer.
     RTX_OPTION("rtx", fast_unordered_set, cardNormalsTextures, {},
-                  "Objects rendered with these textures are shaded with a bent normal instead of their vertex normals: per hit, the direction from the card's center (the midpoint of the triangle's longest edge) to the hit point, mixed with world up by rtx.cardNormals.upWeight.
-"
+                  "Objects rendered with these textures are shaded with a bent normal instead of their vertex normals: per hit, the direction from the card's center (the midpoint of the triangle's longest edge) to the hit point, mixed with world up by rtx.cardNormals.upWeight.\n"
                   "Meant for flat foliage cards, which otherwise shade as flat planes (one side lit, one black). The normal lies in the card plane, so both sides of a card shade the same.");
     
   public:
