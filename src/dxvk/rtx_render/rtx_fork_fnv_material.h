@@ -8,6 +8,7 @@
 //   RS 149  Modifier       Bits 0-3 hold the diffuse slot, 4-7 the normal slot, 8-11 the glow slot and 12-15 the
 //                          height slot, with 0xF meaning absent. Bit 16 marks an RGB tangent-space normal map.
 //                          Bit 17 makes normal alpha drive roughness, as set by rtx.fnvProtocol.normalAlphaMode.
+//                          Bits 18-20 (RBR-RTX): glow x albedo, glow = rgb + alpha, glow = alpha only.
 //   RS 169  Gloss          IEEE float bits of the Blinn-Phong glossiness exponent.
 //   RS 177  Emittance      D3DCOLOR tint of the glow map.
 // Both 0xFEFEFEFE (the wrapper's "clear" value) and 0 (the D3D9 device default) mean absent for every render state.
@@ -41,6 +42,10 @@ namespace dxvk {
     static constexpr uint32_t kHeightSlotShift = 12;
     static constexpr uint32_t kNormalRgbTangentSpace = 1u << 16;
     static constexpr uint32_t kNormalAlphaIsSpecMask = 1u << 17;
+    // RBR-RTX: the glow lights the albedo's picture (glow * albedo), glow = rgb + alpha, glow = alpha only.
+    static constexpr uint32_t kGlowTimesAlbedo = 1u << 18;
+    static constexpr uint32_t kGlowRgbPlusAlpha = 1u << 19;
+    static constexpr uint32_t kGlowAlphaOnly = 1u << 20;
     // This RS 42 bit lies above every InstanceCategories bit.
     static constexpr uint32_t kPerDrawPath = 1u << 31;
 

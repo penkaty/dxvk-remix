@@ -2829,7 +2829,8 @@ namespace dxvk {
         (forkFnvFlags & OPAQUE_SURFACE_MATERIAL_FLAG_ROUGHNESS_FROM_NORMAL_ALPHA) != 0,
         (forkFnvFlags & OPAQUE_SURFACE_MATERIAL_FLAG_EMISSIVE_TEXTURE_TINTED) != 0,
         terrainLayersMaterialIndex,
-        (forkFnvFlags & OPAQUE_SURFACE_MATERIAL_FLAG_NORMAL_ALPHA_IS_GLOSS) != 0
+        (forkFnvFlags & OPAQUE_SURFACE_MATERIAL_FLAG_NORMAL_ALPHA_IS_GLOSS) != 0,
+        uint8_t((forkFnvFlags >> OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_MODE_SHIFT) & 7u)
       };
 
       opaqueSurfaceMaterial.setPomConeAvailable(pomConeAvailable);

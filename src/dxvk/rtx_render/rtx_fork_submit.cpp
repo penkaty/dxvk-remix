@@ -7,6 +7,9 @@
 #include "rtx_scene_manager.h"    // SceneManager
 #include "rtx_scene_interface.h"  // scene::Options::assetKeys
 
+#include <mutex>
+#include <unordered_map>
+
 namespace dxvk {
 namespace fork_hooks {
 
@@ -40,6 +43,34 @@ namespace fork_hooks {
     return imageHash != albedo.getImageHash() ? imageHash : kEmptyHash;
   }
 
+  // A USD replacement fills only the inputs it sets; the rest comes from the draw's own material, as the D3D9 path's
+  // determineMaterialData merges the legacy material in. Without it a replacement that brings only normal/roughness/
+  // height (the albedo stays the game's texture) renders the API draw with the default albedo: flat grey ground.
+  // Merged copies are cached per (replacement, own material); a hot reload hands out new replacements, so the cache is
+  // dropped when it grows past what one stage needs.
+  std::shared_ptr<MaterialData> mergedReplacement(
+      const std::shared_ptr<MaterialData>& replacement, const MaterialData& own) {
+    if (replacement->getType() != MaterialDataType::Opaque || own.getType() != MaterialDataType::Opaque) {
+      return replacement;
+    }
+    static std::mutex s_mutex;
+    static std::unordered_map<XXH64_hash_t, std::pair<std::weak_ptr<MaterialData>, std::shared_ptr<MaterialData>>> s_merged;
+    const XXH64_hash_t ownHash = own.getHash();
+    const XXH64_hash_t key = XXH64(&ownHash, sizeof(ownHash), replacement->getHash());
+    std::lock_guard<std::mutex> lock(s_mutex);
+    auto it = s_merged.find(key);
+    if (it != s_merged.end() && it->second.first.lock() == replacement) {
+      return it->second.second;
+    }
+    if (s_merged.size() > 8192) {
+      s_merged.clear();
+    }
+    auto merged = std::make_shared<MaterialData>(*replacement);
+    merged->getOpaqueMaterialData().merge(own.getOpaqueMaterialData());
+    s_merged[key] = { replacement, merged };
+    return merged;
+  }
+
   // Points the caller's material at its USD replacement (getReplacementMaterial) if there is one.
   // The material's own hash (or its host asset key) is looked up first, then its game texture hash.
   std::shared_ptr<MaterialData> externalDrawMaterialReplacement(
@@ -63,6 +94,7 @@ namespace fork_hooks {
       }
     }
     if (pReplacementMaterial != nullptr) {
+      pReplacementMaterial = mergedReplacement(pReplacementMaterial, *material);
       material = pReplacementMaterial.get();
     }
     return pReplacementMaterial;

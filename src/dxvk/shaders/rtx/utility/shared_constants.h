@@ -90,6 +90,12 @@ static const uint8_t surfaceMaterialTypeMask = uint8_t(0x3u);
 // With ROUGHNESS_FROM_NORMAL_ALPHA: the alpha is gloss (inverted roughness, NVR convention) instead of a specular mask:
 // roughness = lerp(fnvGlossRoughnessMin, fnvGlossRoughnessMax, 1 - normal.a).
 #define OPAQUE_SURFACE_MATERIAL_FLAG_NORMAL_ALPHA_IS_GLOSS (1 << 3)
+// RBR-RTX glow modes (RBRHUD gauge displays: lit = tex * (mask.a + (night ? mask.rgb : 0))), bits 4-6:
+// the glow sample is multiplied by the albedo; glow.rgb = rgb + a; glow.rgb = a only.
+#define OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_MODE_SHIFT 4
+#define OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_TIMES_ALBEDO (1 << 4)
+#define OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_RGB_PLUS_ALPHA (1 << 5)
+#define OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_ALPHA_ONLY (1 << 6)
 
 // Flags word of the terrain-layers surface-material extension entry (TerrainLayersMaterial).
 #define TERRAIN_LAYERS_MATERIAL_FLAG_NORMALS_RGB_TANGENT_SPACE (1 << 0)

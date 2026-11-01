@@ -1170,9 +1170,20 @@ OpaqueSurfaceMaterialInteraction opaqueSurfaceMaterialInteractionCreate(
   if (emissiveColorLoaded)
   {
     // Glow map tinted by the emittance color carried in emissiveColorConstant.
-    emissiveColor = (opaqueSurfaceMaterialFnvFlags(opaqueSurfaceMaterial) & OPAQUE_SURFACE_MATERIAL_FLAG_EMISSIVE_TEXTURE_TINTED) != 0 ?
-      emissiveColorSample.xyz * opaqueSurfaceMaterial.emissiveColorConstant :
-      emissiveColorSample.xyz;
+    // RBR-RTX glow modes (shared_constants.h): which channels of the glow map light the surface.
+    const uint glowFlags = opaqueSurfaceMaterialFnvFlags(opaqueSurfaceMaterial);
+    vec3 glow = emissiveColorSample.xyz;
+    if ((glowFlags & OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_ALPHA_ONLY) != 0)
+    {
+      glow = vec3(emissiveColorSample.w);
+    }
+    else if ((glowFlags & OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_RGB_PLUS_ALPHA) != 0)
+    {
+      glow = saturate(emissiveColorSample.xyz + emissiveColorSample.w);
+    }
+    emissiveColor = (glowFlags & OPAQUE_SURFACE_MATERIAL_FLAG_EMISSIVE_TEXTURE_TINTED) != 0 ?
+      glow * opaqueSurfaceMaterial.emissiveColorConstant :
+      glow;
   }
 
   // Load Albedo/Opacity
@@ -1205,6 +1216,13 @@ OpaqueSurfaceMaterialInteraction opaqueSurfaceMaterialInteractionCreate(
                            opaqueSurfaceMaterial.roughnessConstant, albedo, terrainTangentNormal, terrainRoughness);
     // The blend replaces the tinted base albedo, so the tint applies to the blended albedo as well.
     albedo *= opaqueSurfaceMaterialAlbedoTint(opaqueSurfaceMaterial);
+  }
+
+  // RBR-RTX: the glow lights the albedo's own picture (a gauge display drawn into the albedo texture), as RBRHUD's
+  // CarTextureNoDirtEmMask does: lit = tex * mask.
+  if (emissiveColorLoaded && (opaqueSurfaceMaterialFnvFlags(opaqueSurfaceMaterial) & OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_TIMES_ALBEDO) != 0)
+  {
+    emissiveColor *= albedo;
   }
 
 #if defined(RAY_TRACING_PRIMARY_RAY)

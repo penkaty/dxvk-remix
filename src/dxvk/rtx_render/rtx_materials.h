@@ -735,7 +735,8 @@ struct RtOpaqueSurfaceMaterial {
     // FNV material protocol v2 and terrain-layers extension, see shared_constants.h.
     bool normalRgbTangentSpace = false, bool roughnessFromNormalAlpha = false, bool emissiveTextureTinted = false,
     uint32_t terrainLayersMaterialIndex = SURFACE_INDEX_INVALID,
-    bool normalAlphaIsGloss = false
+    bool normalAlphaIsGloss = false,
+    uint8_t glowMode = 0
   ) :
     m_albedoOpacityTextureIndex{ albedoOpacityTextureIndex }, m_secondaryTextureIndex{secondaryTextureIndex}, m_normalTextureIndex{ normalTextureIndex },
     m_tangentTextureIndex { tangentTextureIndex }, m_heightTextureIndex { heightTextureIndex }, m_roughnessTextureIndex{ roughnessTextureIndex },
@@ -759,6 +760,7 @@ struct RtOpaqueSurfaceMaterial {
     m_specularMetalPacked{ specularMetalPacked },
     m_normalRgbTangentSpace{ normalRgbTangentSpace }, m_roughnessFromNormalAlpha{ roughnessFromNormalAlpha },
     m_emissiveTextureTinted{ emissiveTextureTinted }, m_normalAlphaIsGloss{ normalAlphaIsGloss },
+    m_glowMode{ glowMode },
     m_terrainLayersMaterialIndex{ terrainLayersMaterialIndex }
   {
     updateCachedData();
@@ -1060,7 +1062,8 @@ struct RtOpaqueSurfaceMaterial {
                     (m_roughnessFromNormalAlpha ? OPAQUE_SURFACE_MATERIAL_FLAG_ROUGHNESS_FROM_NORMAL_ALPHA : 0) |
                     (m_emissiveTextureTinted ? OPAQUE_SURFACE_MATERIAL_FLAG_EMISSIVE_TEXTURE_TINTED : 0) |
                     // NORMAL_ALPHA_IS_GLOSS only qualifies ROUGHNESS_FROM_NORMAL_ALPHA.
-                    (m_roughnessFromNormalAlpha && m_normalAlphaIsGloss ? OPAQUE_SURFACE_MATERIAL_FLAG_NORMAL_ALPHA_IS_GLOSS : 0));
+                    (m_roughnessFromNormalAlpha && m_normalAlphaIsGloss ? OPAQUE_SURFACE_MATERIAL_FLAG_NORMAL_ALPHA_IS_GLOSS : 0) |
+                    (uint32_t(m_glowMode) << OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_MODE_SHIFT));
   }
 
   // These features are written in the alternate layout (OPAQUE_SURFACE_MATERIAL_FLAG_FNV_LAYOUT).
@@ -1172,7 +1175,7 @@ private:
       m_roughnessFloor,
       m_specularMetalPacked,
       (m_normalRgbTangentSpace ? 1u : 0u) | (m_roughnessFromNormalAlpha ? 2u : 0u) | (m_emissiveTextureTinted ? 4u : 0u) |
-        (m_normalAlphaIsGloss ? 8u : 0u),
+        (m_normalAlphaIsGloss ? 8u : 0u) | (uint32_t(m_glowMode) << OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_MODE_SHIFT),
       m_terrainLayersMaterialIndex,
     };
     m_cachedHash = hashStructByMemory<HashStruct,
@@ -1290,6 +1293,7 @@ private:
   bool m_roughnessFromNormalAlpha;
   bool m_emissiveTextureTinted;
   bool m_normalAlphaIsGloss;
+  uint8_t m_glowMode;                 // OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_* >> GLOW_MODE_SHIFT
   uint32_t m_terrainLayersMaterialIndex;
 
   XXH64_hash_t m_cachedHash;

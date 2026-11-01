@@ -130,6 +130,9 @@ namespace dxvk {
       opaqueMat.setEmissiveIntensity(glowEmissiveIntensity());
       opaqueMat.setEnableEmission(true);
       shaderFlags |= OPAQUE_SURFACE_MATERIAL_FLAG_EMISSIVE_TEXTURE_TINTED;
+      if (protocol.modifier & FnvLegacyProtocol::kGlowTimesAlbedo) shaderFlags |= OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_TIMES_ALBEDO;
+      if (protocol.modifier & FnvLegacyProtocol::kGlowRgbPlusAlpha) shaderFlags |= OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_RGB_PLUS_ALPHA;
+      if (protocol.modifier & FnvLegacyProtocol::kGlowAlphaOnly) shaderFlags |= OPAQUE_SURFACE_MATERIAL_FLAG_GLOW_ALPHA_ONLY;
     }
 
     if (protocol.heightTexture.isValid() && heightDisplaceIn() > 0.0f) {
