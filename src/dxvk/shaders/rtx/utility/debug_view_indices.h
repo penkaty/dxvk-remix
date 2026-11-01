@@ -308,6 +308,11 @@
 // R = the cloud's weight in the motion vector, G = cloud opacity, B = the depth is the cloud's.
 #define DEBUG_VIEW_CLOUD_MOTION_VECTOR_MASK 914
 
+// Wetness (RBR-RTX, after xoxor4d), written by rtx_fork_wetness.slangh on primary hits.
+// 890: rain map at the hit (R covered, G depression x5, B slope x2). 891: puddles (R water, G shore, B wet blend).
+#define DEBUG_VIEW_FORK_RAIN_MAP 890
+#define DEBUG_VIEW_FORK_PUDDLES 891
+
 enum class CompositeDebugView : uint32_t {
   Disabled = 0,
   FinalRenderWithMaterialProperties,

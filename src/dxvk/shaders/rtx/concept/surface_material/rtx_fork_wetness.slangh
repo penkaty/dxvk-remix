@@ -1,0 +1,503 @@
+// src/dxvk/shaders/rtx/concept/surface_material/rtx_fork_wetness.slangh
+//
+// Fork-owned. Wetness of surfaces in rtx.wetTextures (RBR-RTX), after the per draw wetness of xoxor4d's GTA IV
+// branch (dxvk-remix game/gta4, rtx_fork_wetness.slangh at bde0b307; zlib/MIT). Credit to xoxor4d; his comments are kept.
+// Applied by opaqueSurfaceMaterialInteractionCreate.
+//
+// RBR-RTX changes against his file:
+//  - no per draw packed value (render state 210): the surface category rtx.wetTextures selects the surfaces and the
+//    frame options (cb.wetBlendWidth, cb.wetMinNormal, cb.wetFlags, ...) replace the packed bits; the wetness of the
+//    frame is cb.wetGlobalWetness (0 = this file does nothing, the caller tests it);
+//  - the scene up axis is generic (cb.isZUp = rtx.zUp; RBR is Y-up): "up" is z or y, the plane the map and the noise
+//    live in is xy or xz, and every direction vector built in that plane goes through forkWetFromPlane;
+//  - the object space raindrops of vehicles and peds (flag 3) are left out: they need a per draw channel;
+//  - raindrop density and strength follow cb.wetRainIntensity.
+//
+// Layers, from the bottom:
+//  base    - roughness scaled by the wetness with a floor, albedo darkened and saturated by porosity
+//  patches - wetness variation: wet and less wet patches with streaks
+//  puddles - standing water: a water level in world units against the ground's small unevenness and,
+//            with the rain map (quality 2), its measured depressions and slope. Inside, the water surface
+//            replaces the ground: flat normal with wind ripples, its own roughness, darkened bottom; a damp
+//            shore band around it
+//  rain    - raindrop impacts, stronger inside puddles
+//
+// Rain shadow: quality 2 reads the rain map (static geometry only, moving objects never dry the road); quality 1
+// and points beyond the map trace a short upward ray. Detail levels: primary and PSR hits
+// (RAY_TRACING_PRIMARY_RAY) evaluate everything; indirect bounces, shadow rays and NEE cache samples take the base
+// layer alone. Noise comes from the shared value noise LUT.
+
+#pragma once
+
+#include "rtx/pass/instance_definitions.h"
+#include "rtx/concept/camera/camera.slangh"
+#include "rtx/utility/procedural_noise.slangh"
+
+#ifdef RAY_TRACING_PRIMARY_RAY
+#define FORK_WETNESS_DEFAULT_DETAIL true
+#else
+#define FORK_WETNESS_DEFAULT_DETAIL false
+#endif
+
+#define FORK_WET_FLAG_PATCHES          (1u << 0)
+#define FORK_WET_FLAG_PUDDLES          (1u << 1)
+#define FORK_WET_FLAG_RAIN_SHADOW      (1u << 2)
+#define FORK_WET_FLAG_RAIN_SHADOW_DITHER (1u << 3)
+#define FORK_WET_FLAG_RAINDROPS        (1u << 4)
+
+// Scene up axis helpers. The "plane" is what the rain map, the noise and the raindrops live in: xy for Z-up, xz for Y-up.
+vec3 forkWetUpVector()
+{
+  return cb.isZUp ? vec3(0.0f, 0.0f, 1.0f) : vec3(0.0f, 1.0f, 0.0f);
+}
+
+vec2 forkWetPlane(vec3 position)
+{
+  return cb.isZUp ? position.xy : position.xz;
+}
+
+float forkWetHeight(vec3 position)
+{
+  return cb.isZUp ? position.z : position.y;
+}
+
+vec3 forkWetFromPlane(vec2 v, float up)
+{
+  return cb.isZUp ? vec3(v.x, v.y, up) : vec3(v.x, up, v.y);
+}
+
+float forkWetHash21(vec2 p)
+{
+  p = frac(p * vec2(123.34f, 456.21f));
+  p += dot(p, p + 45.32f);
+  return frac(p.x * p.y);
+}
+
+vec2 forkWetHash22(vec2 p)
+{
+  const float n = forkWetHash21(p);
+  return vec2(n, frac(n * 1.337f + 0.618033f));
+}
+
+// Four value noise fields in [-1, 1] at one point; the slice decorrelates call sites.
+vec4 forkWetnessNoise4(vec2 xy, float scale, float slice)
+{
+  return valueNoiseLutSample<false>(float3(xy * scale, slice));
+}
+
+// Bilinear fetch of the map by hand (no sampler is bound for it): texels without geometry are left out of the blend, the
+// result is the weighted mean of the valid ones, or a miss (y below the trace range) when none is.
+vec4 forkWetnessRainMapFetch(vec2 uv)
+{
+  const int last = int(cb.wetMapResolution) - 1;
+  const vec2 t = uv * float(cb.wetMapResolution) - 0.5f;
+  const vec2 base = floor(t);
+  const vec2 f = t - base;
+  vec4 sum = vec4(0.0f);
+  float weightSum = 0.0f;
+  [unroll]
+  for (int i = 0; i < 4; ++i)
+  {
+    const int2 offset = int2(i & 1, i >> 1);
+    const int2 coord = clamp(int2(base) + offset, int2(0, 0), int2(last, last));
+    const vec4 v = ForkRainMap.Load(int3(coord, 0));
+    const float w = (offset.x == 0 ? 1.0f - f.x : f.x) * (offset.y == 0 ? 1.0f - f.y : f.y) * (v.y > cb.wetMapTraceBottom - 0.5f ? 1.0f : 0.0f);
+    sum += v * w;
+    weightSum += w;
+  }
+  return weightSum > 0.0f ? sum / weightSum : vec4(0.0f, cb.wetMapTraceBottom - 1.0f, 0.0f, 0.0f);
+}
+
+// Rain map at a world position (given by its plane coordinates): x rain cover (0 exposed .. 1 covered, blurred over
+// the feather radius), y ground height (up axis), z depression of the ground, w slope of the ground. `weight` is 1
+// inside the map, fades to 0 over its outer fifth, and is 0 where the map found nothing or when the map is off.
+vec4 forkWetnessRainMap(vec2 xy, out float weight)
+{
+  weight = 0.0f;
+  if (cb.wetPuddleQuality < 2)
+  {
+    return vec4(0.0f);
+  }
+  const vec2 uv = (xy - vec2(cb.wetMapOriginX, cb.wetMapOriginY)) / cb.wetMapExtent;
+  const float margin = 1.0f / float(cb.wetMapResolution);
+  const vec2 fromCenter = abs(uv - 0.5f);
+  const float fade = 1.0f - smoothstep(0.4f, 0.5f - margin, max(fromCenter.x, fromCenter.y));
+  if (fade <= 0.0f)
+  {
+    return vec4(0.0f);
+  }
+  const vec4 value = forkWetnessRainMapFetch(uv);
+  weight = value.y > cb.wetMapTraceBottom - 0.5f ? fade : 0.0f;
+  return value;
+}
+
+// Rain shadow by ray: 0 when static opaque geometry is above the point, 1 otherwise. Every triangle is a candidate
+// (forced non-opaque) so moving objects and alpha tested surfaces are looked through; the first static, fully opaque
+// hit ends the search. Hits closer than minHeight do not count.
+float forkWetnessRainExposureRay(vec3 position, float rayLength, float minHeight)
+{
+  RayDesc rayDesc;
+  rayDesc.Origin = position;
+  rayDesc.Direction = forkWetUpVector();
+  rayDesc.TMin = max(minHeight, 0.01f);
+  rayDesc.TMax = max(rayLength, rayDesc.TMin + 0.01f);
+
+  const uint rayFlags = RAY_FLAG_FORCE_NON_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+  RayQuery<0> rayQuery = RayQuery<0>();
+  rayQuery.TraceRayInline(topLevelAS, rayFlags, OBJECT_MASK_OPAQUE, rayDesc);
+
+  while (rayQuery.Proceed())
+  {
+    if (rayQuery.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
+    {
+      const uint surfaceIndex = (rayQuery.CandidateInstanceID() & CUSTOM_INDEX_SURFACE_MASK) + rayQuery.CandidateGeometryIndex();
+      const Surface hitSurface = surfaces[nonuniformEXT(surfaceIndex)];
+      if (hitSurface.isStatic && hitSurface.isFullyOpaque)
+      {
+        rayQuery.CommitNonOpaqueTriangleHit();
+      }
+    }
+  }
+
+  return rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT ? 0.0f : 1.0f;
+}
+
+// Raindrop impacts on world surfaces: expanding rings on a jittered grid in the ground plane.
+void forkWetnessWorldRaindrops(
+  SurfaceInteraction surfaceInteraction,
+  float raindropScaleMult, float densityBias, float upDot, float occlusionFactor, float strengthScale,
+  inout float roughness, inout vec3 normal)
+{
+  const float animationSpeedMult = 0.4f;
+  const float raindropStrength = 5.0f;
+  const float raindropRoughnessScale = 2.7f;
+  const float raindropNormalScale = 0.5f;
+  const float raindropVisibilityMult = 14.0f;
+
+  const float global_time = float(cb.frameIdx) * 0.0333333f * animationSpeedMult;
+
+  const int GRID_NEIGHBOR = 2;
+  // RBR-RTX: densityBias replaces his halfDensity flag (0.85 full, 0.3 half); the grid stays positive at small scales
+  const float grid_scale = max(3.4f * raindropScaleMult - 4.4f * densityBias, 0.5f);
+  const float spawn_period = 0.6f;
+  const float drop_life = 0.3f;
+  const float ripple_speed = 1.6f * raindropScaleMult;
+
+  const float center_radius_base = 0.13f;
+  const float center_strength = 0.45f * raindropVisibilityMult - 3.2f;
+  const float ripple_thickness = 0.035f;
+  const float ripple_strength = 0.18f * raindropVisibilityMult * 0.54f;
+
+  const float normal_scale_center = 1.35f * raindropNormalScale;
+  const float normal_scale_ripple = 0.18f * raindropNormalScale;
+  const float roughness_center = 0.62f * raindropRoughnessScale;
+  const float roughness_ripple = 0.14f * raindropRoughnessScale;
+
+  float accum_visibility = 0.0f;
+  float accum_roughness = 0.0f;
+  vec3 accum_normal_offset = vec3(0.0f);
+
+  const vec2 sample_pos = forkWetPlane(surfaceInteraction.position);
+  const vec2 cell = floor(sample_pos * grid_scale);
+
+  for (int oy = -GRID_NEIGHBOR; oy <= GRID_NEIGHBOR; ++oy)
+  {
+    for (int ox = -GRID_NEIGHBOR; ox <= GRID_NEIGHBOR; ++ox)
+    {
+      const vec2 ncell = cell + vec2(float(ox), float(oy));
+      const float seed = forkWetHash22(ncell).x;
+
+      // Lifetime first: dead cells cost one hash
+      const float time_since_spawn = global_time - seed * spawn_period;
+      const float local_t = time_since_spawn - floor(time_since_spawn / spawn_period) * spawn_period;
+      const float cell_life = drop_life * lerp(0.85f, 1.25f, frac(seed * 7.3f));
+      if (local_t < 0.0f || local_t > cell_life)
+      {
+        continue;
+      }
+
+      const vec2 center_jitter = (forkWetHash22(ncell + 17.0f) - 0.5f) * 0.7f;
+      const vec2 drop_center = (ncell + 0.5f + center_jitter) / grid_scale;
+      const float dist = length(sample_pos - drop_center);
+
+      const float tnorm = local_t / cell_life;
+      const float cell_center_radius = center_radius_base * raindropScaleMult * lerp(0.85f, 1.25f, frac(seed * 5.2f));
+      const float ripple_radius = ripple_speed * lerp(0.85f, 1.15f, frac(seed * 3.1f)) * local_t;
+      const float ring_thickness = max(ripple_thickness * (0.5f + 0.5f * tnorm), 0.01f);
+
+      // Neither the impact nor the ring reaches this point
+      const float ring_dist = abs(dist - ripple_radius);
+      if (dist >= cell_center_radius && ring_dist >= ring_thickness)
+      {
+        continue;
+      }
+
+      const float center_fade = smoothstep(0.0f, 1.0f, 1.0f - tnorm);
+      float center_mask = saturate(1.0f - dist / (cell_center_radius + 1e-5f));
+      center_mask = pow(center_mask, 1.25f) * center_fade;
+
+      float ring_mask = saturate(1.0f - ring_dist / ring_thickness);
+      ring_mask *= smoothstep(0.12f, 0.30f, tnorm) * (1.0f - smoothstep(0.78f, 0.98f, tnorm));
+
+      const float center_amp = center_strength * smoothstep(1.0f, 0.0f, tnorm);
+      const float ring_amp = ripple_strength * lerp(0.7f, 1.0f, tnorm);
+
+      const float cell_visibility = saturate(center_mask * center_amp + ring_mask * ring_amp * 0.75f);
+
+      vec3 center_normal = vec3(0.0f);
+      if (center_mask > 0.001f)
+      {
+        const vec2 radial = (sample_pos - drop_center) / (cell_center_radius + 1e-6f);
+        const float height = sqrt(saturate(1.0f - dot(radial, radial)));
+        center_normal = normalize(forkWetFromPlane(radial * 0.9f, height)) * (center_mask * center_amp * normal_scale_center * 0.6f);
+      }
+
+      const float rndAngle = frac(seed * 19.7f) * 6.2831853f;
+      const vec3 ring_dir = normalize(forkWetFromPlane(vec2(cos(rndAngle), sin(rndAngle)), -0.45f));
+      accum_normal_offset += center_normal + ring_dir * (ring_mask * ring_amp * normal_scale_ripple);
+
+      accum_roughness += center_mask * center_amp * roughness_center + ring_mask * ring_amp * roughness_ripple;
+
+      const float cell_weight = saturate(1.0f - length(ncell - cell) * 0.38f);
+      accum_visibility += cell_visibility * cell_weight;
+    }
+  }
+
+  float combinedRaindropMask = saturate(accum_visibility * (1.4f * raindropVisibilityMult)) * (raindropStrength * 0.85f);
+  combinedRaindropMask *= occlusionFactor;
+
+  const float nOffLen = length(accum_normal_offset);
+  if (nOffLen > 0.0005f)
+  {
+    accum_normal_offset = normalize(accum_normal_offset) * (nOffLen * 0.45f);
+  }
+
+  if (combinedRaindropMask > 0.0001f && occlusionFactor > 0.0f)
+  {
+    const float raindropNormalIntensity = saturate(upDot * 2.0f) * combinedRaindropMask * strengthScale;
+    normal = normalize(normal + accum_normal_offset * raindropNormalIntensity);
+    roughness = saturate(roughness + saturate(accum_roughness) * 0.28f * strengthScale);
+  }
+}
+
+// Wind ripples on standing water: six directional waves spread by the golden angle with wavelengths growing by
+// 1.37 and deep water dispersion (longer waves travel faster), so no two share a period and no lattice forms; a
+// drifting noise envelope lets them come and go in gusts; each wave fades out once it is shorter than a few pixels
+// at the hit distance so distant puddles do not alias into a grid. Returns the normal offset in world space
+// (in the ground plane).
+vec3 forkWetnessWindRipples(vec2 xy, float cameraDistance)
+{
+  const float t = cb.timeSinceStartSeconds * cb.wetRippleSpeed;
+  const float shortest = cb.wetRippleWavelength * 0.01f;
+  // About four pixels of footprint at 1080p
+  const float footprint = cameraDistance * 0.004f;
+
+  vec2 slope = vec2(0.0f);
+  float amplitude = 1.0f;
+  float wavelength = shortest;
+  float total = 0.0f;
+  [unroll]
+  for (int i = 0; i < 6; ++i)
+  {
+    const float angle = 0.7f + float(i) * 2.39996f;
+    const vec2 dir = vec2(cos(angle), sin(angle));
+    const float speed = 2.6f * sqrt(wavelength / shortest);
+    const float visible = saturate(1.0f - footprint / wavelength);
+    slope += dir * (amplitude * visible * cos(dot(xy, dir) * (6.2831853f / wavelength) + t * speed + float(i) * 1.7f));
+    total += amplitude;
+    amplitude *= 0.78f;
+    wavelength *= 1.37f;
+  }
+  slope /= total;
+
+  const float gust = saturate(forkWetnessNoise4(xy + t * 0.3f, 0.6f, 71.0f).x * 0.5f + 0.5f);
+  const float envelope = lerp(1.0f - cb.wetRippleVariation, 1.0f, gust);
+  return forkWetFromPlane(-slope * (cb.wetRippleStrength * envelope), 0.0f);
+}
+
+// Entry point. `fullDetail` false takes the base layer only (roughness scaling and floor, darkening).
+// The caller has checked surface.useWet and cb.wetGlobalWetness > 0.
+void forkApplyWetness(
+  Surface surface,
+  SurfaceInteraction surfaceInteraction,
+  bool fullDetail,
+  inout float roughness,
+  inout vec3 normal,
+  inout float normalDetail,
+  inout vec3 albedo)
+{
+  // 1 when fully wet, 0 when dry
+  const float wetness = saturate(cb.wetGlobalWetness);
+  // roughness multiplier of the surface at this wetness: 1 dry, wetFullyWetRoughnessScale fully wet
+  const float scalar = lerp(1.0f, cb.wetFullyWetRoughnessScale, wetness);
+  const float zNormal = cb.wetMinNormal;
+  const float blendWidth = cb.wetBlendWidth;
+
+  const bool enableWetnessVariation = (cb.wetFlags & FORK_WET_FLAG_PATCHES) != 0;
+  const bool enablePuddleLayer = (cb.wetFlags & FORK_WET_FLAG_PUDDLES) != 0;
+  const bool enableOcclusionCheck = (cb.wetFlags & FORK_WET_FLAG_RAIN_SHADOW) != 0;
+  const bool useSmoothOcclusion = (cb.wetFlags & FORK_WET_FLAG_RAIN_SHADOW_DITHER) != 0;
+  const bool enableRaindrops = (cb.wetFlags & FORK_WET_FLAG_RAINDROPS) != 0;
+
+  // Vertical walls get no wetness
+  const vec3 upVector = forkWetUpVector();
+  const float originalNormalUp = dot(surfaceInteraction.geometryNormal, upVector);
+  if (originalNormalUp <= 0.1f)
+  {
+    return;
+  }
+
+  const float wetblendBase = saturate(smoothstep(zNormal - blendWidth, zNormal + blendWidth, originalNormalUp));
+  float wetblendForRoughness = wetblendBase;
+
+  const float roughnessDry = roughness;
+
+  float puddleAmount = 0.0f; // standing water, 1 over the whole puddle
+  float puddleDepth = 0.0f;  // water depth in world units
+  float shoreAmount = 0.0f;  // damp ground around it
+
+  if (fullDetail)
+  {
+    const float cameraDistance = length(surfaceInteraction.position - cameraGetWorldPosition(cb.camera));
+    const bool canBeWet = wetblendBase > 0.0f;
+    const vec2 xy = forkWetPlane(surfaceInteraction.position);
+    const float positionHeight = forkWetHeight(surfaceInteraction.position);
+
+    float rainMapWeight;
+    const vec4 rainMap = forkWetnessRainMap(xy, rainMapWeight);
+    const bool hasMap = rainMapWeight > 0.5f;
+    // The relief belongs to the mapped ground; a point well above it (a bridge deck over a street) gets none
+    const bool onMappedGround = hasMap && abs(rainMap.y - positionHeight) < 0.5f;
+    // With the map on, puddles exist only where the map does (faded over its outer band); beyond it the rain shadow
+    // would be a hard per pixel ray and puddles would cut at every roof line
+    const float mapWeight = cb.wetPuddleQuality >= 2 ? saturate(rainMapWeight) : 1.0f;
+
+    // Rain shadow: the blurred cover of the map for points on the mapped ground, by ray elsewhere (a bridge deck
+    // above the mapped street, beyond the map; faded to exposed over the second half of the ray distance)
+    float occlusionFactor = 1.0f;
+    if (enableOcclusionCheck && cb.wetPuddleQuality > 0)
+    {
+      if (onMappedGround)
+      {
+        occlusionFactor = 1.0f - saturate(rainMap.x);
+      }
+      else if (cameraDistance <= cb.wetOcclusionDistance)
+      {
+        vec3 samplePosition = surfaceInteraction.position;
+        if (useSmoothOcclusion)
+        {
+          // Dithered sample position; DLSS-RR hides the grain
+          samplePosition += forkWetFromPlane(forkWetnessNoise4(xy, 200.0f, 3.0f).xy * 1.8f, 0.0f);
+        }
+        occlusionFactor = forkWetnessRainExposureRay(samplePosition, cb.wetOcclusionRayLength, cb.wetOcclusionMinHeight);
+        occlusionFactor = lerp(occlusionFactor, 1.0f, smoothstep(cb.wetOcclusionDistance * 0.5f, cb.wetOcclusionDistance, cameraDistance));
+      }
+    }
+
+    if ((enableWetnessVariation || (enablePuddleLayer && cb.wetPuddleQuality > 0)) && canBeWet && cameraDistance <= cb.wetDetailDistance)
+    {
+      // Wet / less wet patches with streaks
+      if (enableWetnessVariation)
+      {
+        const vec4 fine = forkWetnessNoise4(xy, 0.2f, 11.0f);
+        const vec4 coarse = forkWetnessNoise4(xy, 0.03f, 29.0f);
+        const vec4 streak = valueNoiseLutSample<false>(float3(xy * vec2(0.1f, 0.5f), 41.0f));
+
+        float thresholdRemapped = saturate((saturate(fine.x * 0.5f + 0.5f) - 0.25f) / 0.75f);
+        thresholdRemapped = pow(thresholdRemapped, 1.0f / 2.6f);
+        float baseWetnessMask = lerp(0.5f, 1.0f, thresholdRemapped);
+
+        const float largePuddleMask = saturate(coarse.x * 0.5f + 0.5f);
+        baseWetnessMask = saturate(baseWetnessMask + largePuddleMask * largePuddleMask * 0.3f);
+
+        float rippleMask = saturate((abs(streak.x) + abs(streak.y)) * 0.4f);
+        rippleMask = pow(rippleMask, 1.0f / 2.4f);
+
+        const float puddleMask = saturate(baseWetnessMask - rippleMask * 0.18f) * occlusionFactor;
+        wetblendForRoughness = lerp(wetblendBase, wetblendBase * puddleMask, 1.1f);
+      }
+
+      // Standing water on flat, static ground (never on a moving car or a ped): a water level against the ground height
+      if (enablePuddleLayer && cb.wetPuddleQuality > 0 && surface.isStatic && originalNormalUp >= 0.95f && wetness > 0.0f && mapWeight > 0.0f)
+      {
+        // Small scale unevenness of the ground, two octaves, in world units
+        const float noiseFreq = 1.0f / cb.wetNoiseScale;
+        const float n1 = forkWetnessNoise4(xy, noiseFreq, 53.0f).x;
+        const float n2 = forkWetnessNoise4(xy, noiseFreq * 2.7f, 61.0f).x;
+        const float micro = (n1 + 0.5f * n2) * (cb.wetMicroAmplitude / 1.5f);
+
+        // Measured depressions lower the ground, slopes shed the water
+        const float depression = onMappedGround ? max(rainMap.z, 0.0f) * cb.wetDepressionWeight : 0.0f;
+        const float slopeFade = onMappedGround ? 1.0f - smoothstep(cb.wetSlopeLimit, cb.wetSlopeLimit * (1.0f + cb.wetSlopeFeather), rainMap.w) : 1.0f;
+        const float terrain = micro - depression;
+
+        // The level rises with wetness: -amplitude (dry, nothing under water) to +amplitude at full coverage
+        const float level = cb.wetMicroAmplitude * (2.0f * saturate(cb.wetPuddleCoverage) * wetness - 1.0f);
+        const float depth = level - terrain;
+
+        // 1 on flat ground (the old ramp peaked at 0.55 there, which kept every puddle half transparent)
+        const float horizontalFactor = smoothstep(0.95f, 0.98f, originalNormalUp);
+        const float exposure = wetblendBase * horizontalFactor * lerp(1.0f, occlusionFactor, cb.wetPuddleOcclusion) * slopeFade * mapWeight;
+
+        puddleAmount = smoothstep(0.0f, cb.wetEdgeWidth, depth) * exposure;
+        puddleDepth = max(depth, 0.0f);
+        shoreAmount = smoothstep(-cb.wetShoreWidth, 0.0f, depth) * (1.0f - smoothstep(0.0f, cb.wetEdgeWidth, depth)) * exposure * wetness;
+      }
+    }
+
+    if (puddleAmount > 0.001f)
+    {
+      // The water surface replaces the ground: flat, rippled, no normal map detail
+      normal = normalize(lerp(normal, surfaceInteraction.geometryNormal, puddleAmount));
+      normalDetail *= 1.0f - puddleAmount;
+      if (cb.wetRippleStrength > 0.0f)
+      {
+        normal = normalize(normal + forkWetnessWindRipples(xy, cameraDistance) * puddleAmount);
+      }
+    }
+
+    if (enableRaindrops && cb.wetRainIntensity > 0.0f && cameraDistance <= cb.wetRaindropDistance)
+    {
+      // 0.85 is his full density; weaker rain thins the rings out and fades them
+      const float densityBias = lerp(1.2f, 0.85f, cb.wetRainIntensity);
+      forkWetnessWorldRaindrops(surfaceInteraction, cb.wetRaindropScale, densityBias, originalNormalUp,
+                                occlusionFactor, lerp(cb.wetRaindropGroundScale, 1.0f, puddleAmount) * cb.wetRainIntensity * wetness,
+                                roughness, normal);
+    }
+
+#if defined(RAY_TRACING_PRIMARY_RAY)
+    if (cb.debugView == DEBUG_VIEW_FORK_RAIN_MAP)
+    {
+      const float covered = onMappedGround ? saturate(rainMap.x) : 0.0f;
+      storeInDebugView(getDispatchRaysIndex().xy, vec3(covered, onMappedGround ? saturate(rainMap.z * 5.0f) : 0.0f, onMappedGround ? saturate(rainMap.w * 2.0f) : 0.0f));
+    }
+    else if (cb.debugView == DEBUG_VIEW_FORK_PUDDLES)
+    {
+      storeInDebugView(getDispatchRaysIndex().xy, vec3(puddleAmount, shoreAmount, wetblendBase * wetness * 0.3f));
+    }
+#endif
+  }
+
+  // Base layer: roughness scaled by the wetness scalar, reduced further the wetter the surface is, floored so wet
+  // ground stays a glossy surface and does not turn into a mirror
+  roughness = saturate(lerp(roughness, roughness * scalar, wetblendForRoughness));
+  if (wetblendForRoughness > 0.0f)
+  {
+    roughness = saturate(roughness * (1.0f - wetness * 0.5f * wetblendForRoughness * 0.4f));
+    roughness = max(roughness, min(roughnessDry, cb.wetMinRoughness));
+  }
+  roughness = lerp(roughness, min(roughnessDry, cb.wetPuddleRoughness), puddleAmount);
+
+  // Wet ground darkens and saturates; porous (rough, dark) materials the most, paint and glass hardly at all
+  const float wetAmount = wetness * wetblendForRoughness;
+  if (wetAmount > 0.0f)
+  {
+    const float luminanceDry = dot(albedo, vec3(0.2126f, 0.7152f, 0.0722f));
+    const float porosity = smoothstep(0.25f, 0.75f, roughnessDry) * lerp(0.6f, 1.0f, 1.0f - saturate(luminanceDry * 2.0f));
+    albedo *= 1.0f - cb.wetAlbedoDarkening * porosity * wetAmount;
+    const float luminance = dot(albedo, vec3(0.2126f, 0.7152f, 0.0722f));
+    albedo = max(lerp(vec3(luminance), albedo, 1.0f + cb.wetSaturationBoost * wetAmount), vec3(0.0f));
+  }
+  albedo *= lerp(1.0f, cb.wetShoreDarkening, shoreAmount);
+  albedo *= lerp(1.0f, cb.wetPuddleDarkening, puddleAmount * saturate(puddleDepth / 0.02f));
+}

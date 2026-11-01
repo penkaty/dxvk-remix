@@ -329,6 +329,10 @@ namespace dxvk {
     RTX_OPTION("rtx", fast_unordered_set, cardNormalsTextures, {},
                   "Objects rendered with these textures are shaded with a bent normal instead of their vertex normals: per hit, the direction from the card's center (the midpoint of the triangle's longest edge) to the hit point, mixed with world up by rtx.cardNormals.upWeight.\n"
                   "Meant for flat foliage cards, which otherwise shade as flat planes (one side lit, one black). The normal lies in the card plane, so both sides of a card shade the same.");
+    // RBR-RTX: wetness (after xoxor4d's per draw wetness); the rtx.wet.* options are in rtx_fork_wetness.h.
+    RTX_OPTION("rtx", fast_unordered_set, wetTextures, {},
+                  "Objects rendered with these textures can get wet (road and ground textures): darker and glossier with rtx.wet.globalWetness, puddles in hollows, raindrop ripples. "
+                  "Nothing happens while rtx.wet.globalWetness is 0. See rtx.wet.* options.");
     
   public:
     RTX_OPTION("rtx", bool, showRaytracingOption, true, "Enables or disables the option to toggle ray tracing in the UI. When set to false the ray tracing checkbox will not appear in the Remix UI.");

@@ -1037,6 +1037,7 @@ namespace dxvk {
         currentInstance.surface.isTextureFactorBlend = legacySurface.isTextureFactorBlend;
         currentInstance.surface.isVertexColorBakedLighting = legacySurface.isVertexColorBakedLighting;
         currentInstance.surface.useCardNormals = currentInstance.testCategoryFlags(InstanceCategories::CardNormals);
+        currentInstance.surface.useWet = currentInstance.testCategoryFlags(InstanceCategories::Wet);   // RBR-RTX
         currentInstance.surface.isMotionBlurMaskOut = currentInstance.testCategoryFlags(InstanceCategories::IgnoreMotionBlur);
 
         // Note: Skip the spritesheet adjustment logic in the surface interaction when using Ray Portal materials as this logic

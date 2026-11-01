@@ -57,6 +57,7 @@ namespace dxvk {
     { "remix_category:smooth_normals",            "Smooth Normals",            "rtx.smoothNormalsTextures" },
     { "remix_category:hair_cards",                "Hair Cards",                "rtx.hairCardTextures" },
     { "remix_category:card_normals",              "Card Normals",              "rtx.cardNormalsTextures" },
+    { "remix_category:wet",                       "Wet Surface",               "rtx.wetTextures" },
   };
   // NV-DXVK end
 }

@@ -103,6 +103,8 @@ namespace dxvk {
                                               "Red: the cloud's weight in the motion vector\n"
                                               "Green: cloud opacity\n"
                                               "Blue: the depth is the cloud's"},
+        {DEBUG_VIEW_FORK_RAIN_MAP, "Fork: Rain Map (R covered, G depression x5, B slope x2)"},
+        {DEBUG_VIEW_FORK_PUDDLES, "Fork: Puddles (R water, G shore, B wet blend)"},
         {DEBUG_VIEW_TRIANGLE_NORMAL, "Triangle Normal"},
         {DEBUG_VIEW_INTERPOLATED_VERTEX_NORMAL, "Interpolated Vertex Normal"},
         {DEBUG_VIEW_GEOMETRY_NORMAL, "Geometry Normal"},

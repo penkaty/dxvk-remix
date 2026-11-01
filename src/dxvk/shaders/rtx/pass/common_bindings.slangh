@@ -103,6 +103,10 @@ layout(binding = BINDING_LIGHT_IDENTITY_BUFFER)
 StructuredBuffer<uint2> lightIdentities;
 
 // Light BVH compact nodes and bit trails, see rtx/algorithm/light_bvh.slangh.
+// RBR-RTX: rain map (rtx_fork_rain_map.cpp). x rain cover, y ground height (up axis), z depression, w slope.
+layout(binding = BINDING_FORK_RAIN_MAP)
+Texture2D<float4> ForkRainMap;
+
 layout(binding = BINDING_LIGHT_BVH_BUFFER)
 StructuredBuffer<uint4> lightBvhNodes;
 

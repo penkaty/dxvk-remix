@@ -23,6 +23,9 @@
 
 #include "opaque_surface_material_blending.slangh"
 
+// RBR-RTX: wetness of rtx.wetTextures surfaces (after xoxor4d's wetness)
+#include "rtx/concept/surface_material/rtx_fork_wetness.slangh"
+
 // Opaque Surface Material Interaction Constants
 
 // Note: Threshold value to use for considering the albedo zero or non-zero for some calculations.
@@ -1439,6 +1442,12 @@ OpaqueSurfaceMaterialInteraction opaqueSurfaceMaterialInteractionCreate(
   // NV-DXVK end
 
   metallic = saturate(metallic * cb.opaqueMaterialArgs.metallicScale + cb.opaqueMaterialArgs.metallicBias);
+
+  // RBR-RTX: wetness (rtx.wetTextures, rtx.wet.*). Off (one uniform branch) while rtx.wet.globalWetness is 0.
+  if (surface.useWet && cb.wetGlobalWetness > 0.0f)
+  {
+    forkApplyWetness(surface, surfaceInteraction, FORK_WETNESS_DEFAULT_DETAIL, roughness, normal, normalDetail, albedo);
+  }
 
   // Transform to desired Opaque Material Interaction values
 

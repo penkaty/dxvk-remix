@@ -575,6 +575,49 @@ struct RaytraceArgs {
   // RBR-RTX: rtx.cardNormalsKeepGeometryNormal (1: the card normal shades only, the geometry normal stays the triangle's).
   uint cardNormalsKeepGeometryNormal;
 
+  // RBR-RTX: wetness (rtx.wet.*), filled by rtx_fork_wetness.cpp and rtx_fork_rain_map.cpp. After xoxor4d's wetness.
+  float wetOcclusionRayLength;
+  float wetOcclusionDistance;
+  float wetDetailDistance;
+  float wetRaindropDistance;
+  float wetMinRoughness;
+  float wetAlbedoDarkening;
+  float wetSaturationBoost;
+  float wetPuddleCoverage;
+  float wetPuddleRoughness;
+  float wetPuddleDarkening;
+  float wetShoreDarkening;
+  float wetRippleStrength;
+  float wetRippleWavelength;
+  float wetRippleSpeed;
+  float wetRaindropGroundScale;
+  float wetOcclusionMinHeight;
+  float wetPuddleOcclusion;
+  float wetNoiseScale;
+  float wetMicroAmplitude;
+  float wetDepressionWeight;
+  float wetSlopeLimit;
+  float wetEdgeWidth;
+  float wetShoreWidth;
+  float wetSlopeFeather;
+  float wetRippleVariation;
+  float wetOcclusionFeather;
+  float wetGlobalWetness;
+  float wetBlendWidth;
+  float wetMinNormal;
+  float wetFullyWetRoughnessScale;
+  float wetRainIntensity;
+  float wetRaindropScale;
+  uint wetFlags; // FORK_WET_FLAG_* (rtx_fork_wetness.slangh)
+  uint wetPuddleQuality;
+  uint wetMapResolution;
+  float wetMapOriginX;
+  float wetMapOriginY;
+  float wetMapExtent;
+  float wetMapTexel;
+  float wetMapTraceTop;
+  float wetMapTraceBottom;
+
   // NOTE: Add structs to the top section of RaytraceArgs, not the bottom.
   // NOTE: bool does not work in debug builds, use uint instead.
 };

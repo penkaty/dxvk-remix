@@ -78,6 +78,11 @@
 // while rtx.lightSampling.logDirectStats is on. The host logs them as [LightSamplingStats].
 #define BINDING_LIGHT_SAMPLING_STATS             219
 
+// Rain map (RBR-RTX, after xoxor4d's rtx_fork_rain_map). RGBA32F top-down height field of the static geometry around the
+// camera, traced each frame by rtx_fork_rain_map.cpp: x rain cover, y ground height (up axis), z depression, w slope.
+// Read by the wetness model (rtx_fork_wetness.slangh) with Load (no sampler).
+#define BINDING_FORK_RAIN_MAP                    220
+
 #define COMMON_MAX_BINDING                       BINDING_LIGHT_IDENTITY_BUFFER
 #define COMMON_NUM_BINDINGS                      (COMMON_MAX_BINDING + 1)
 
@@ -137,6 +142,7 @@
   STRUCTURED_BUFFER(BINDING_NIGHT_SKY_STARS)                        \
   STRUCTURED_BUFFER(BINDING_NIGHT_SKY_MILKY_WAY)                    \
   TEXTURE2D(BINDING_NIGHT_SKY_STARLIGHT_LOW)                        \
-  TEXTURE2D(BINDING_NIGHT_SKY_MOON)
+  TEXTURE2D(BINDING_NIGHT_SKY_MOON)                                 \
+  TEXTURE2D(BINDING_FORK_RAIN_MAP)
 
 #endif

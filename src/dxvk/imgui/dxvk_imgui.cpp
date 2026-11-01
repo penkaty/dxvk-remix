@@ -225,7 +225,8 @@ namespace dxvk {
     {"raytracedRenderTargetTextures","Raytraced Render Target Textures (optional)", &RtxOptions::raytracedRenderTargetTexturesObject(), ImGUI::kTextureFlagsRenderTarget},
     {"particleemittertextures","Particle Emitters (optional)", &RtxOptions::particleEmitterTexturesObject()},
     {"smoothnormalstextures","Smooth Normals (optional)", &RtxOptions::smoothNormalsTexturesObject()},
-    {"cardnormalstextures","Card Normals (optional)", &RtxOptions::cardNormalsTexturesObject()}
+    {"cardnormalstextures","Card Normals (optional)", &RtxOptions::cardNormalsTexturesObject()},
+    {"wettextures","Wet Surface Textures (optional)", &RtxOptions::wetTexturesObject()}
   };
 
   RemixGui::ComboWithKey<RenderPassGBufferRaytraceMode> renderPassGBufferRaytraceModeCombo {
@@ -3322,6 +3323,13 @@ namespace dxvk {
         RemixGui::Checkbox("Capture Texcoords from Shader", &D3D9Rtx::useVertexCapturedTexcoordsObject());
         RemixGui::Separator();
         RemixGui::Checkbox("Use World Transforms", &D3D9Rtx::useWorldMatricesForShadersObject());
+        ImGui::Unindent();
+      }
+
+      // RBR-RTX: wetness (after xoxor4d)
+      if (RemixGui::CollapsingHeader("Wetness", collapsingHeaderClosedFlags)) {
+        ImGui::Indent();
+        fork_hooks::showWetnessSettings();
         ImGui::Unindent();
       }
 

@@ -41,6 +41,8 @@ namespace dxvk { class D3D9DeviceEx; class RemixApiDevice; }
 // Provides the tonemap shader args structs for the tonemap hooks.
 #include "rtx/pass/tonemap/tonemapping.h"
 
+struct RaytraceArgs;
+
 namespace dxvk {
 
   class DxvkContext;
@@ -418,6 +420,21 @@ namespace dxvk {
       const std::vector<RtInstance*>& instanceTable,
       uint32_t recordedVectorIdx,
       uint64_t recordedInstanceUid);
+
+    // RBR-RTX wetness (after xoxor4d): fills the rtx.wet.* constants and picks this frame's rain map window.
+    // Implementation in rtx_fork_wetness.cpp.
+    void fillWetnessShaderParams(RtxContext& ctx, RaytraceArgs& constants);
+
+    // Traces the rain map (top-down height field of the static geometry around the camera) for this frame.
+    // After the acceleration structures are built, before the path tracing pass. Implementation in rtx_fork_rain_map.cpp.
+    void dispatchRainMap(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput);
+
+    // The view bound at BINDING_FORK_RAIN_MAP in the common ray tracing set (a placeholder while the map is off).
+    // Implementation in rtx_fork_rain_map.cpp.
+    Rc<DxvkImageView> rainMapView(RtxContext& ctx);
+
+    // Body of the "Wetness" header under Game Setup -> Parameter Tuning. Implementation in rtx_fork_wetness.cpp.
+    void showWetnessSettings();
 
   } // namespace fork_hooks
 

@@ -786,6 +786,9 @@ namespace dxvk {
         recordGpuStageTiming("Volumetrics");
         preGateFlush(3);
         
+        // Rain map (RBR-RTX, after xoxor4d): the wetness model reads it in the G-buffer pass
+        fork_hooks::dispatchRainMap(*this, rtOutput);
+
         // Path Tracing
         dispatchPathTracing(rtOutput);
         frameFeaturesValidateAfterPasses(*this); // rtx.frameFeatures.validate seen-bit read-back
@@ -2277,6 +2280,7 @@ namespace dxvk {
     constants.isZUp = RtxOptions::zUp();
     constants.cardNormalsUpWeight = RtxOptions::CardNormals::upWeight();
     constants.cardNormalsKeepGeometryNormal = RtxOptions::CardNormals::cardNormalsKeepGeometryNormal() ? 1 : 0;
+    fork_hooks::fillWetnessShaderParams(*this, constants);   // RBR-RTX: rtx.wet.* and the rain map window
     constants.enableCullingSecondaryRays = RtxOptions::enableCullingInSecondaryRays();
 
     constants.domeLightArgs = getSceneManager().getLightManager().getDomeLightArgs();
@@ -2401,6 +2405,9 @@ namespace dxvk {
 
     // Sky provider (NUMOS) outputs, slots 200-213.
     getCommonObjects()->metaNumos().bindCommonResources(*this);
+
+    // RBR-RTX: rain map of the wetness model (the map, or a 1x1 placeholder while it is off)
+    bindResourceView(BINDING_FORK_RAIN_MAP, fork_hooks::rainMapView(*this), nullptr);
   }
 
   void RtxContext::bindResourceView(const uint32_t slot, const Rc<DxvkImageView>& imageView, const Rc<DxvkBufferView>& bufferView)
