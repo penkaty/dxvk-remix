@@ -433,9 +433,6 @@ namespace dxvk {
     // Implementation in rtx_fork_rain_map.cpp.
     Rc<DxvkImageView> rainMapView(RtxContext& ctx);
 
-    // Body of the "Wetness" header under Game Setup -> Parameter Tuning. Implementation in rtx_fork_wetness.cpp.
-    void showWetnessSettings();
-
   } // namespace fork_hooks
 
 } // namespace dxvk

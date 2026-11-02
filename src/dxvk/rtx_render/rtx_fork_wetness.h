@@ -168,7 +168,6 @@ namespace dxvk {
                     args.minValue = 0.0f, args.maxValue = 1.0f);
 
     static void fillShaderParams(RtxContext& ctx, RaytraceArgs& constants);
-    static void showImguiSettings();
   };
 
 } // namespace dxvk

@@ -3326,13 +3326,6 @@ namespace dxvk {
         ImGui::Unindent();
       }
 
-      // RBR-RTX: wetness (after xoxor4d)
-      if (RemixGui::CollapsingHeader("Wetness", collapsingHeaderClosedFlags)) {
-        ImGui::Indent();
-        fork_hooks::showWetnessSettings();
-        ImGui::Unindent();
-      }
-
       if (RemixGui::CollapsingHeader("View Model", collapsingHeaderClosedFlags)) {
         ImGui::Indent();
         RemixGui::Checkbox("Enable View Model", &RtxOptions::ViewModel::enableObject());

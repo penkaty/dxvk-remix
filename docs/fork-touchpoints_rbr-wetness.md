@@ -8,7 +8,7 @@ by the instance category `rtx.wetTextures` (like CardNormals), the rest are fram
 ## New files
 | File | What |
 | :-- | :-- |
-| `src/dxvk/rtx_render/rtx_fork_wetness.{h,cpp}` | `rtx.wet.*` options, `fillShaderParams` (RaytraceArgs), ImGui body |
+| `src/dxvk/rtx_render/rtx_fork_wetness.{h,cpp}` | `rtx.wet.*` options, `fillShaderParams` (RaytraceArgs); no ImGui panel (the RBR-RTX proxy's F3 menu sets the options) |
 | `src/dxvk/rtx_render/rtx_fork_rain_map.{h,cpp}` | rain map resources, window (plane perpendicular to the up axis), two compute dispatches, placeholder view |
 | `src/dxvk/shaders/rtx/concept/surface_material/rtx_fork_wetness.slangh` | the shader model (`forkApplyWetness`) |
 | `src/dxvk/shaders/rtx/pass/fork_rain_map/rain_map_{trace,relief}.comp.slang`, `rain_map_bindings.slangh`, `rain_map_binding_indices.h` | rain map passes |
@@ -25,8 +25,8 @@ by the instance category `rtx.wetTextures` (like CardNormals), the rest are fram
 | `shaders/rtx/concept/surface/surface.h` | `useWet` property (data0b.z bit 3) |
 | `rtx_render/rtx_remix_api.cpp` | `static_assert(Count == 27)` |
 | `lssusd/remix_category_names.h` | `remix_category:wet` |
-| `imgui/dxvk_imgui.cpp` | texture list entry "Wet Surface Textures"; header "Wetness" under Game Setup -> Step 2 |
-| `rtx_render/rtx_fork_hooks.h` | `fillWetnessShaderParams`, `dispatchRainMap`, `rainMapView`, `showWetnessSettings` (+ `struct RaytraceArgs;`) |
+| `imgui/dxvk_imgui.cpp` | texture list entry "Wet Surface Textures" (the "Wetness" header was removed 2026-11-02) |
+| `rtx_render/rtx_fork_hooks.h` | `fillWetnessShaderParams`, `dispatchRainMap`, `rainMapView` (+ `struct RaytraceArgs;`) |
 | `rtx_render/rtx_context.cpp` | `fillWetnessShaderParams` in `updateRaytraceArgsConstantBuffer`; `dispatchRainMap` before `dispatchPathTracing`; `BINDING_FORK_RAIN_MAP` in `bindCommonRayTracingResources` |
 | `rtx_render/rtx_debug_view.cpp`, `shaders/rtx/utility/debug_view_indices.h` | debug views 890 (rain map), 891 (puddles) |
 | `shaders/rtx/pass/raytrace_args.h` | 41 `wet*` fields at the end of `RaytraceArgs` |
