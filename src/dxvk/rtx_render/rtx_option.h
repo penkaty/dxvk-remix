@@ -233,6 +233,10 @@ namespace dxvk {
     // Layer value operations
     void readOptionLayer(const RtxOptionLayer& optionLayer);
     void readOption(const Config& options, const RtxOptionLayer* layer);
+    // A value from remixapi_SetConfigVariable: into the host layers, never into a layer Save writes (see
+    // kRtxOptionLayerHostListsKey). A texture list replaces the host's last one; a "-0x..." entry is an explicit removal
+    // and goes to the rtx.conf layer, like unticking the texture in the menu.
+    void readHostOption(const Config& options);
     bool loadFromEnvironmentVariable(const RtxOptionLayer* envLayer, std::string* outValue = nullptr);
     void disableLayerValue(const RtxOptionLayer* layer);
     void updateLayerBlendStrength(const RtxOptionLayer& optionLayer);

@@ -389,6 +389,45 @@ namespace dxvk {
     }
   }
 
+  void RtxOptionImpl::readHostOption(const Config& options) {
+    const std::string fullName = getFullName();
+    if (!options.findOption(fullName.c_str())) {
+      return;
+    }
+    if (m_type != OptionType::HashSet) {
+      readOption(options, RtxOptionLayer::getHostDriversLayer());
+      return;
+    }
+    const RtxOptionLayer* listsLayer = RtxOptionLayer::getHostListsLayer();
+    if (!listsLayer) {
+      return;
+    }
+    auto [listsValue, created] = getOrCreateGenericValue(listsLayer);
+    if (!listsValue) {
+      return;
+    }
+    std::vector<std::string> positives;
+    for (const std::string& raw : options.getOption<std::vector<std::string>>(fullName.c_str())) {
+      const size_t start = raw.find_first_not_of(" \t\r\n");
+      if (start == std::string::npos) {
+        continue;
+      }
+      if (raw[start] != '-') {
+        positives.push_back(raw);
+        continue;
+      }
+      const RtxOptionLayer* confLayer = RtxOptionLayer::getRtxConfLayer();
+      auto [confValue, confCreated] = getOrCreateGenericValue(confLayer);
+      if (confValue) {
+        confValue->hashSet->remove(std::strtoull(raw.c_str() + start + 1, nullptr, 16));
+        confLayer->onLayerValueChanged();
+      }
+    }
+    listsValue->hashSet->clearAll();
+    listsValue->hashSet->parseFromStrings(positives);
+    markDirty();
+  }
+
   void RtxOptionImpl::readOption(const Config& options, const RtxOptionLayer* layer) {
     if (!layer) {
       return;

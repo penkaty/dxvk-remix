@@ -186,6 +186,11 @@ namespace dxvk {
   static constexpr RtxOptionLayerKey kRtxOptionLayerDefaultKey     = { 0,          "Default Values" };
   static constexpr RtxOptionLayerKey kRtxOptionLayerDxvkConfKey    = { 1,          "DXVK Config" };
   static constexpr RtxOptionLayerKey kRtxOptionLayerConfigCppKey   = { 2,          "Hardcoded EXE Config" };
+  // Values a host sets through remixapi_SetConfigVariable. Neither layer has a file, so Save never writes them.
+  // Texture lists sit below rtx.conf: a texture the user flags or unflags in the menu beats the host per hash.
+  // Everything else sits below user.conf and above the rest: the host drives it, a saved user setting still wins.
+  static constexpr RtxOptionLayerKey kRtxOptionLayerHostListsKey   = { 2,          "Host Lists (not saved)" };
+  static constexpr RtxOptionLayerKey kRtxOptionLayerHostDriversKey = { 0xFFFFFFFD, "Host Drivers (not saved)" };
   static constexpr RtxOptionLayerKey kRtxOptionLayerRtxConfKey     = { 3,          "Remix Config" };
   static constexpr RtxOptionLayerKey kRtxOptionLayerBaseGameModKey = { 4,          "baseGameMod Remix Config" };
   static constexpr RtxOptionLayerKey kRtxOptionLayerEnvironmentKey = { 5,          "Environment Variable Overrides" };  // Env vars set initial value, can be overridden by code

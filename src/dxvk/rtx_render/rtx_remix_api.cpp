@@ -2036,7 +2036,7 @@ namespace {
     // every frame (FNV's sun/moon/camera drive) races that walk and eventually
     // corrupts the map mid-iteration.
     std::lock_guard optionLock { dxvk::RtxOptionImpl::getUpdateMutex() };
-    option->readOption(newSetting, dxvk::RtxOptionLayer::getUserLayer());
+    option->readHostOption(newSetting);
 
     return REMIXAPI_ERROR_CODE_SUCCESS;
   }

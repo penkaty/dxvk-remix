@@ -284,6 +284,8 @@ namespace dxvk {
     
     // Accessors for system layers
     static const RtxOptionLayer* getUserLayer() { return s_userLayer; }
+    static const RtxOptionLayer* getHostListsLayer() { return s_hostListsLayer; }
+    static const RtxOptionLayer* getHostDriversLayer() { return s_hostDriversLayer; }
     static const RtxOptionLayer* getDefaultLayer();
     static RtxOptionLayer* getRtxConfLayer() { return s_rtxConfLayer; }
     static const RtxOptionLayer* getEnvironmentLayer() { return s_environmentLayer; }
@@ -311,6 +313,8 @@ namespace dxvk {
     inline static const RtxOptionLayer* s_qualityLayer = nullptr;
     inline static const RtxOptionLayer* s_derivedLayer = nullptr;
     inline static RtxOptionLayer* s_userLayer = nullptr;
+    inline static const RtxOptionLayer* s_hostListsLayer = nullptr;
+    inline static const RtxOptionLayer* s_hostDriversLayer = nullptr;
 
     // Merged config from all config-file-based layers
     inline static Config s_mergedConfig;
