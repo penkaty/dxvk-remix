@@ -461,7 +461,7 @@ void forkApplyWetness(
       // 0.85 is his full density; weaker rain thins the rings out and fades them
       const float densityBias = lerp(1.2f, 0.85f, cb.wetRainIntensity);
       forkWetnessWorldRaindrops(surfaceInteraction, cb.wetRaindropScale, densityBias, originalNormalUp,
-                                occlusionFactor, lerp(cb.wetRaindropGroundScale, 1.0f, puddleAmount) * cb.wetRainIntensity * wetness,
+                                occlusionFactor, lerp(cb.wetRaindropGroundScale, 1.0f, puddleAmount) * cb.wetRainIntensity * saturate(wetness * 5.0f),
                                 roughness, normal);
     }
 
