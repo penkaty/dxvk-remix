@@ -178,10 +178,14 @@ void forkWetnessWorldRaindrops(
 
   const int GRID_NEIGHBOR = 2;
   // RBR-RTX: densityBias replaces his halfDensity flag (0.85 full, 0.3 half); the grid stays positive at small scales
-  const float grid_scale = max(3.4f * raindropScaleMult - 4.4f * densityBias, 0.5f);
   const float spawn_period = 0.6f;
   const float drop_life = 0.3f;
   const float ripple_speed = 1.6f * raindropScaleMult;
+  // RBR-RTX: density apart from size. Size alone set the grid, so small rings were also very rare (one per 4 square units).
+  // A ring may not outgrow the cells searched around the point, which limits the density.
+  const float base_grid = max(3.4f * raindropScaleMult - 4.4f * densityBias, 0.5f);
+  const float ring_cells = float(GRID_NEIGHBOR) / max(ripple_speed * drop_life * 1.44f, 0.01f);
+  const float grid_scale = max(base_grid, min(base_grid * cb.wetRaindropDensity * sqrt(saturate(cb.wetRainIntensity)), ring_cells));
 
   const float center_radius_base = 0.13f;
   const float center_strength = 0.45f * raindropVisibilityMult - 3.2f;

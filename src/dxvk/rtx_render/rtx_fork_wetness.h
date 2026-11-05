@@ -168,6 +168,9 @@ namespace dxvk {
     RTX_OPTION_ARGS("rtx.wet", float, raindropScale, 3.0f,
                     "Size of the raindrop rings (the grid cell size is inverse to it).",
                     args.minValue = 0.1f, args.maxValue = 10.0f);
+    RTX_OPTION_ARGS("rtx.wet", float, raindropDensity, 4.0f,
+                    "Drops per grid axis, apart from their size: 4 = 16 times the drops of 1. Scaled down in lighter rain.",
+                    args.minValue = 1.0f, args.maxValue = 8.0f);
     RTX_OPTION_ARGS("rtx.wet", float, raindropGroundScale, 0.5f,
                     "Strength of raindrop impacts on wet ground outside puddles, relative to inside puddles.",
                     args.minValue = 0.0f, args.maxValue = 1.0f);

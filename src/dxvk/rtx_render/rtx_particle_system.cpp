@@ -384,7 +384,7 @@ namespace dxvk {
     constants.absoluteTimeSecs = GlobalTime::get().absoluteTimeMs() * 0.001f * timeScale();
 
     constants.resolveTransparencyThreshold = RtxOptions::resolveTransparencyThreshold();
-    constants.minParticleSize = 2.f; // NOTE: In pixels
+    constants.minParticleSize = minScreenSize(); // NOTE: In pixels of the render resolution
     constants.sceneScale = RtxOptions::sceneScale();
 
     // Whether the spawn kernel has a TLAS to trace. Simulation runs before AccelManager::prepareSceneData builds

@@ -53,6 +53,7 @@ namespace dxvk {
     constants.wetFullyWetRoughnessScale = std::max(fullyWetRoughnessScale(), 0.0f);
     constants.wetRainIntensity = std::clamp(rainIntensity(), 0.0f, 1.0f);
     constants.wetRaindropScale = std::max(raindropScale(), 0.1f);
+    constants.wetRaindropDensity = std::max(raindropDensity(), 1.0f);
     constants.wetFlags = (patches() ? 1u : 0u) | (puddles() ? 2u : 0u) | (rainShadow() ? 4u : 0u) |
                          (rainShadowDither() ? 8u : 0u) | (raindrops() ? 16u : 0u);
 

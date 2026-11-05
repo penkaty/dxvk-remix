@@ -4,7 +4,7 @@
 a short queue of patches for [RBR-RTX](https://github.com/penkaty/RBR-RTX), a Richard Burns Rally add-on.
 Problems here are ours: please do not report them to Remix Plus or NVIDIA.
 `git log kim/fnv/main..rbr-main` lists every change. CardNormals and wetness come from xoxor4d's work.
-Licences are unchanged: see `LICENSE.txt`. The original README follows.
+This is the runtime RBR-RTX 0.4.0 ships; its options are listed in [the release notes](https://github.com/penkaty/RBR-RTX/blob/main/docs/release-0.4.0.md). Licences are unchanged: see `LICENSE.txt`. The original README follows.
 
 # Remix Plus
 
