@@ -1,3 +1,11 @@
+# Remix Plus, altered for RBR-RTX
+
+**This is an altered version, not the original.** The `rbr-main` branch is Remix Plus (`Kim2091/dxvk-remix`, branch `fnv/main`) with
+a short queue of patches for [RBR-RTX](https://github.com/penkaty/RBR-RTX), a Richard Burns Rally add-on.
+Problems here are ours: please do not report them to Remix Plus or NVIDIA.
+`git log kim/fnv/main..rbr-main` lists every change. CardNormals and wetness come from xoxor4d's work.
+Licences are unchanged: see `LICENSE.txt`. The original README follows.
+
 # Remix Plus
 
 [![Build Status](https://github.com/RemixProjGroup/dxvk-remix/actions/workflows/build.yml/badge.svg)](https://github.com/RemixProjGroup/dxvk-remix/actions/workflows/build.yml)
