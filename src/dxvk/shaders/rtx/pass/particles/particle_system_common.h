@@ -262,7 +262,8 @@ struct ParticleSystemConstants {
   vec3 killBoxAxisS;
   float killBoxHalfHeight;
   uint killBoxEnabled;
-  uint killBoxPad0;
+  // Billboards fade from this size to twice it, in screen heights, then are dropped. 0 turns it off.
+  float maxScreenCoverage;
   uint killBoxPad1;
   uint killBoxPad2;
 };

@@ -204,6 +204,7 @@ namespace dxvk {
       ImGui::BeginDisabled(!enable());
       RemixGui::Checkbox("Enable Spawning", &enableSpawningObject());
       RemixGui::DragFloat("Time Scale", &timeScaleObject(), 0.01f, 0.f, 1.f, "%.2f");
+      RemixGui::DragFloat("Max Screen Coverage", &maxScreenCoverageObject(), 0.01f, 0.f, 16.f, "%.2f");
 
       if (RemixGui::CollapsingHeader("Emitter Discontinuity Lerp Guard", ImGuiTreeNodeFlags_CollapsingHeader)) {
         ImGui::Indent();
@@ -400,7 +401,8 @@ namespace dxvk {
     constants.killBoxAxisF = vec3(1.f, 0.f, 0.f);
     constants.killBoxAxisS = vec3(0.f, 0.f, 1.f);
     constants.killBoxHalfLength = constants.killBoxHalfWidth = constants.killBoxHalfHeight = 0.f;
-    constants.killBoxPad0 = constants.killBoxPad1 = constants.killBoxPad2 = 0;
+    constants.maxScreenCoverage = maxScreenCoverage();
+    constants.killBoxPad1 = constants.killBoxPad2 = 0;
     std::string carBox;
     if (fork_game_state::GameStateStore::get().tryGet("__rbrrtx.carbox", carBox)) {
       int on = 0;

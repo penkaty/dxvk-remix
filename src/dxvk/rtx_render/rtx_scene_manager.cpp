@@ -2272,6 +2272,10 @@ namespace dxvk {
     if (!objectPickingActive || !g_allowMappingLegacyHashToObjectPickingValue) {
       return;
     }
+    if (drawCallState.bakedSourceTextureHash != kEmptyHash) {
+      trackObjectPickingMeta(objectPickingValue, drawCallState.bakedSourceTextureHash, drawCallState.bakedSourceTextureHash2);
+      return;
+    }
     XXH64_hash_t h = drawCallState.getMaterialData().getColorTexture().getImageHash();
     if (h == kEmptyHash) {
       // A Remix API draw: no legacy textures, its albedo's hash rides on the draw.

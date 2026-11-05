@@ -3956,6 +3956,8 @@ namespace dxvk {
         overrideMaterial.colorTextures[0] = (*outOverrideMaterialData)->getOpaqueMaterialData().getAlbedoOpacityTexture();
         overrideMaterial.samplers[0] = terrainBaker.getTerrainSampler();
         overrideMaterial.updateCachedHash();
+        drawCallState.bakedSourceTextureHash = drawCallState.getMaterialData().getColorTexture().getImageHash();
+        drawCallState.bakedSourceTextureHash2 = drawCallState.getMaterialData().getColorTexture2().getImageHash();
         drawCallState.modifyMaterialData() = overrideMaterial;
       }
 

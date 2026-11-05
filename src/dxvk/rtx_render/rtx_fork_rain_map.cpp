@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace dxvk {
 
@@ -65,7 +66,20 @@ namespace dxvk {
       uint32_t resolution = 0;
       bool enabled = false;
       bool traced = false;
+      bool traceThisFrame = true;
+
+      // The window the map was traced for and the options it depends on.
+      float originU = 0.0f;
+      float originV = 0.0f;
+      float traceTop = 0.0f;
+      float traceBottom = 0.0f;
+      Vector3 tracedCamera = Vector3(0.0f);
+      float tracedOptions[6] = {};
+      uint32_t framesSinceTrace = 0;
     };
+
+    // A map that has not been traced for this long is traced again, for geometry that streamed in around a still camera.
+    constexpr uint32_t kMaxFramesBetweenTraces = 60;
 
     State& state() {
       static State* s_state = new State();
@@ -109,23 +123,42 @@ namespace dxvk {
     const float planeV = zUp ? camera.y : camera.z;
     const float camUp = zUp ? camera.z : camera.y;
 
-    // Snapped to the texel grid so the map does not swim with the camera
-    const float originU = std::floor(planeU / texel) * texel - extent * 0.5f;
-    const float originV = std::floor(planeV / texel) * texel - extent * 0.5f;
+    const float options[6] = { float(res), extent, WetnessOptions::mapTraceAbove(), WetnessOptions::mapTraceBelow(),
+                               WetnessOptions::occlusionMinHeight(), WetnessOptions::occlusionFeather() };
+    const float updateDistance = WetnessOptions::mapUpdateDistance();
+    const Vector3 moved = camera - s.tracedCamera;
+
+    s.traceThisFrame = !s.traced || updateDistance <= 0.0f || memcmp(options, s.tracedOptions, sizeof(options)) != 0 ||
+      dot(moved, moved) >= updateDistance * updateDistance || ++s.framesSinceTrace >= kMaxFramesBetweenTraces;
+
+    if (s.traceThisFrame) {
+      // Snapped to the texel grid so the map does not swim with the camera
+      s.originU = std::floor(planeU / texel) * texel - extent * 0.5f;
+      s.originV = std::floor(planeV / texel) * texel - extent * 0.5f;
+      s.traceTop = camUp + std::max(WetnessOptions::mapTraceAbove(), 1.0f);
+      s.traceBottom = camUp - std::max(WetnessOptions::mapTraceBelow(), 1.0f);
+      s.tracedCamera = camera;
+      memcpy(s.tracedOptions, options, sizeof(options));
+      s.framesSinceTrace = 0;
+    }
 
     constants.wetPuddleQuality = uint32_t(std::clamp(WetnessOptions::puddleQuality(), 0, 2));
     constants.wetMapResolution = res;
-    constants.wetMapOriginX = originU;
-    constants.wetMapOriginY = originV;
+    constants.wetMapOriginX = s.originU;
+    constants.wetMapOriginY = s.originV;
     constants.wetMapExtent = extent;
     constants.wetMapTexel = texel;
-    constants.wetMapTraceTop = camUp + std::max(WetnessOptions::mapTraceAbove(), 1.0f);
-    constants.wetMapTraceBottom = camUp - std::max(WetnessOptions::mapTraceBelow(), 1.0f);
+    constants.wetMapTraceTop = s.traceTop;
+    constants.wetMapTraceBottom = s.traceBottom;
   }
 
   void ForkRainMap::dispatch(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput) {
     State& s = state();
     if (!s.enabled) {
+      s.traced = false;
+      return;
+    }
+    if (!s.traceThisFrame) {
       return;
     }
     ensureResources(ctx);

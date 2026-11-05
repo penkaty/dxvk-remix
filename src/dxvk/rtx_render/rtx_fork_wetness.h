@@ -38,6 +38,11 @@ namespace dxvk {
     RTX_OPTION_ARGS("rtx.wet", int, mapResolution, 512,
                     "Texels per side of the rain map. 512 at 128 units gives 0.25 unit texels, enough to resolve a curb.",
                     args.minValue = 64, args.maxValue = 2048);
+    RTX_OPTION_ARGS("rtx.wet", float, mapUpdateDistance, 0.0f,
+                    "How far the camera moves, in world units, before the rain map is traced again. "
+                    "0 traces it every frame. Larger values save GPU time on static scenes, and the map is still "
+                    "refreshed about once a second.",
+                    args.minValue = 0.0f, args.maxValue = 64.0f);
     RTX_OPTION_ARGS("rtx.wet", float, mapTraceAbove, 100.0f,
                     "Rain map rays start this far above the camera (along the scene up axis).",
                     args.minValue = 1.0f);

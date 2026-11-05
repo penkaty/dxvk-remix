@@ -830,6 +830,10 @@ struct DrawCallState {
   // D3D9 image hash for an imported game texture). A D3D9 draw's legacy material carries its own.
   XXH64_hash_t externalPickingTextureHash = kEmptyHash;
 
+  // A baked terrain draw carries the baked material, so these keep the game textures object picking knows it by.
+  XXH64_hash_t bakedSourceTextureHash = kEmptyHash;
+  XXH64_hash_t bakedSourceTextureHash2 = kEmptyHash;
+
   bool isDrawingToRaytracedRenderTarget = false;
   bool isUsingRaytracedRenderTarget = false;
 

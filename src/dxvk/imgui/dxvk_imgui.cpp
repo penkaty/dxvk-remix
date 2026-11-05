@@ -2897,6 +2897,9 @@ namespace dxvk {
           // and callback on result:
           [](std::vector<ObjectPickingValue>&& objectPickingValues, std::optional<XXH64_hash_t> legacyTextureHash) {
             // assert(legacyTextureHash);
+            Logger::info(str::format("[ObjectPicking] world click: ", objectPickingValues.size(), " value(s), first ",
+                                     objectPickingValues.empty() ? 0u : objectPickingValues[0],
+                                     legacyTextureHash ? str::format(", texture ", hashToString(*legacyTextureHash)) : std::string(", no texture known")));
             // found asynchronously the legacy texture hash, place it into texture_popup; so we would highlight it
             texture_popup::g_holdingTexture.exchange(legacyTextureHash.value_or(kEmptyHash));
             // move UI menu focus

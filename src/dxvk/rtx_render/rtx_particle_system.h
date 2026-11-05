@@ -201,6 +201,7 @@ namespace dxvk {
     RTX_OPTION("rtx.particles", bool, enable, true, "Enables particle simulation and rendering.");
     RTX_OPTION("rtx.particles", bool, enableSpawning, true, "Controls whether or not any particle system can currently spawn new particles.");
     RTX_OPTION("rtx.particles", float, timeScale, 1.f, "Time modifier, can be used to slow/speed up time.");
+    RTX_OPTION("rtx.particles", float, maxScreenCoverage, 0.f, "Fades billboards that near the camera, starting at this size in screen heights and gone at twice that. Cuts the cost of a camera inside a cloud of large particles, where each pixel otherwise passes through many of them. 0 turns it off.");
 
     RTX_OPTION("rtx.particles", bool, enableDiscontinuityGuard, false, "ON: when an emitter's one-frame motion deviates from a moving average of its recent velocity (swap / teleport / loop restart), collapse the spawn prev transform to the current one to kill the spawn ghost trail. This may fix bugs where particles seems to blur across large distances for one frame. Option may be removed when instance tracking becomes more reliable.");
     RTX_OPTION_ARGS("rtx.particles", float, discontinuityFactor, 3.0f, "Multiplier on an emitter's recent velocity (plus the floor) above which a one-frame deviation is treated as a discontinuity (swap / teleport), collapsing the spawn context's prev transform to the current one. Higher = more tolerant before snapping. Only used when rtx.particles.enableDiscontinuityGuard is ON.", args.minValue = 1.0f);

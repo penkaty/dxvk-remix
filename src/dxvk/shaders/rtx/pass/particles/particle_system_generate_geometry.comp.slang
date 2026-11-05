@@ -141,7 +141,7 @@ void main(uint2 threadIdx : SV_DispatchThreadID)
   // The degenerate-particle guard below tests the authored size, not the world-space one.
   const float2 authoredSize = particle.size(particleSystem, animationDataTex);
   const float2 size = authoredSize * particleCb.sceneScale;
-  const float4 color = particle.color(particleSystem, animationDataTex);
+  float4 color = particle.color(particleSystem, animationDataTex);
   
   // Particle sizes are authored in centimetres, so testing the authored size keeps this guard
   // independent of rtx.sceneScale. It is only a cheap pre-cull. The screen-space test below
@@ -216,6 +216,19 @@ void main(uint2 threadIdx : SV_DispatchThreadID)
     {
       clearParticleVertices(threadIdx.x, particleSystem);
       return;
+    }
+
+    // Billboards are parallel to the camera plane, so one with a centre behind the camera is entirely behind it.
+    if (particleCb.maxScreenCoverage > 0.0f && centerClip.w > 0.0f)
+    {
+      const float coverage = length(screenDelta) / float(particleCb.renderingHeight);
+      const float fade = saturate(2.0f - coverage / particleCb.maxScreenCoverage);
+      if (fade <= 0.0f)
+      {
+        clearParticleVertices(threadIdx.x, particleSystem);
+        return;
+      }
+      color.w *= fade;
     }
   }
   

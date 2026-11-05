@@ -32,6 +32,10 @@ Entry format:
 
 The New Vegas RTX runtime is Remix Plus with the additions below, which the Fallout: New Vegas integration uses. The dated entries after this section are the Remix Plus trunk's, and this runtime shares only part of that history. It does not have the trunk's frontend interface rework (interface steps I1 to I6f), the input checks at the scene interface, game lights, external frame export, neural uplift or the stress mode.
 
+### Rain map traced only when the camera moved; particles fade before they fill the screen; baked terrain can be picked
+The rain map's static geometry does not change frame to frame, so it can stay valid while the camera covers a few metres. Billboards that fill the screen are the worst case for a camera inside a cloud of large particles. Object picking now reports a baked terrain draw's game texture, not the baked map, so a click in the texture grid finds it.
+- Options: added `rtx.wet.mapUpdateDistance` (default 0, every frame) and `rtx.particles.maxScreenCoverage` (default off). Preset-independent: the game's config sets them.
+
 ### Legacy material protocol for D3D9 hosts
 A host can describe each D3D9 draw's material through render states 42, 149, 169 and 177: instance categories, the diffuse, normal, glow and height texture slots, gloss in the normal map's alpha, RGB tangent-space normal maps and a glow tint. A host can also keep a draw on the per-draw path (bit 31 of render state 42). Materials without these states keep their usual hash and decode.
 - Options: added `rtx.fnvProtocol.enable`, `normalAlphaMode`, `glossRoughnessMin`, `glossRoughnessMax`, `glowEmissiveIntensity`, `heightDisplaceIn`, `apiGlowTint`, and the `[MaterialDump]` diagnostics `logMaterials` and `logMaterialTextures`.
