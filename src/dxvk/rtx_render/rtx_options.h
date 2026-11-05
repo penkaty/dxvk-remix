@@ -199,6 +199,7 @@ namespace dxvk {
     RTX_OPTION("rtx", fast_unordered_set, lightmapTextures, {},
                   "Textures used for lightmapping (baked static lighting on surfaces) in older games.\n"
                   "These textures will be ignored when attempting to determine the desired textures from a draw to use for ray tracing.");
+    RTX_OPTION("rtx", float, particleSkyAmbientScale, 1.f, "Strength of the sky light on particle materials that opt in (all API materials, and USD sky_lit_particle). 0 turns it off, for comparing or for indoor scenes.");
     RTX_OPTION("rtx", fast_unordered_set, skyBoxTextures, {},
                   "Textures on draw calls used for the sky or are otherwise intended to be very far away from the camera at all times (no parallax).\n"
                   "Any draw calls using a texture in this list will be treated as sky and rendered as such in a manner different from typical geometry.");    
