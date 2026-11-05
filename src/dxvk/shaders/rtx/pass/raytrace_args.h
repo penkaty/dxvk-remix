@@ -622,6 +622,13 @@ struct RaytraceArgs {
   float wetPad1;
   float wetPad2;
 
+  // Direct light of nearby sphere lights on sky-lit particles, see evalParticleLocalLights in resolve.slangh.
+  // particleLocalLightMaxCount is 0 when the term is off.
+  uint particleLocalLightMaxCount;
+  float particleLocalLightGain;
+  float particleLocalLightRange;
+  float particleLocalLightPad0;
+
   // NOTE: Add structs to the top section of RaytraceArgs, not the bottom.
   // NOTE: bool does not work in debug builds, use uint instead.
 };

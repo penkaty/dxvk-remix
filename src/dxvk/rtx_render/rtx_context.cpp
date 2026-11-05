@@ -2250,6 +2250,11 @@ namespace dxvk {
     constants.skyMode = static_cast<uint32_t>(RtxOptions::skyMode());
     // Sky light on particle materials flagged OPAQUE_SURFACE_MATERIAL_FLAG_SKY_LIT_PARTICLE.
     constants.particleSkyAmbientScale = RtxOptions::particleSkyAmbientScale();
+    constants.particleLocalLightGain = RtxParticleSystemManager::localLightGain();
+    constants.particleLocalLightRange = RtxParticleSystemManager::localLightRangeMeters() * RtxOptions::getMeterToWorldUnitScale();
+    constants.particleLocalLightMaxCount = RtxParticleSystemManager::localLightGain() > 0.0f
+      ? static_cast<uint32_t>(std::clamp(RtxParticleSystemManager::localLightMaxCount(), 1, 256))
+      : 0u;
 
     const SkyMode currentSkyMode = RtxOptions::skyMode();
     if (currentSkyMode != m_lastSkyMode) {

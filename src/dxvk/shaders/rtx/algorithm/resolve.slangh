@@ -133,6 +133,39 @@ void updateStateOnPortalCrossing<T:IBasePayloadState>(inout T resolveVertexState
   updateStateOnPortalCrossing(resolveVertexState.portalSpace, resolveVertexState.rayMask, rayPortalIndex, hasRayOriginatedFromViewModel);
 }
 
+#ifdef RESOLVE_SKY_LIT_PARTICLES
+// Returns the unshadowed light that nearby sphere lights put on a particle, per unit albedo, in the albedo / pi
+// convention of the froxel cache term. Lights beyond cb.particleLocalLightRange and past the first
+// cb.particleLocalLightMaxCount sphere lights are skipped.
+vec3 evalParticleLocalLights(vec3 position)
+{
+  const LightRangeInfo range = cb.lightRanges[lightTypeSphere];
+  const uint count = min(uint(range.count), cb.particleLocalLightMaxCount);
+  const float rangeSquared = square(cb.particleLocalLightRange);
+  vec3 irradiance = vec3(0.0f);
+
+  for (uint i = 0; i < count; ++i)
+  {
+    DecodedPolymorphicLight decodedLight = decodePolymorphicLight(lights[range.offset + i]);
+    const SphereLight sphereLight = sphereLightCreate(decodedLight);
+    const vec3 lightVector = sphereLight.position - position;
+    const float distanceSquared = squareLength(lightVector);
+
+    if (distanceSquared > rangeSquared)
+    {
+      continue;
+    }
+
+    // The sphere is treated as a point seen from outside, clamped at its surface.
+    const float radiusSquared = square(float(sphereLight.radius));
+    const float shaping = sphereLightCalcShaping(sphereLight, -lightVector * rsqrt(max(distanceSquared, 1e-8f)));
+    irradiance += sphereLight.radiance * (pi * radiusSquared / max(distanceSquared, radiusSquared)) * shaping;
+  }
+
+  return irradiance * (cb.particleLocalLightGain / pi);
+}
+#endif
+
 bool evaluateOpaqueApproximations(
   uint8_t resolveMode,
   Surface surface, SurfaceInteraction surfaceInteraction,
@@ -192,6 +225,12 @@ bool evaluateOpaqueApproximations(
       // The albedo convention matches the froxel term above, with opacity pre-baked.
       emissiveRadiance += opaqueSurfaceMaterialInteraction.albedo * skyAmbient
         * cb.particleSkyAmbientScale * incomingRadianceAttenuation;
+    }
+
+    if (skyLitParticle && cb.particleLocalLightMaxCount)
+    {
+      emissiveRadiance += opaqueSurfaceMaterialInteraction.albedo * evalParticleLocalLights(surfaceInteraction.position)
+        * incomingRadianceAttenuation;
     }
 #endif
   }

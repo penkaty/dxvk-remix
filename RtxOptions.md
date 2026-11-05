@@ -1040,7 +1040,11 @@ This file is generated from the source by `scripts/gen_rtx_options_md.py`. Run `
 |rtx.particles.globalPreset.turbulenceFrequency|float|0.05|||Frequency \(rate of change\) of the turbulence forces\. Lower values change slowly; higher values change rapidly\.  This is specified in centimeters\.|
 |rtx.particles.globalPreset.useSpawnTexcoords|bool|False|||Use the texture coordinates of the emitter mesh when spawning particles\.|
 |rtx.particles.globalPreset.useTurbulence|bool|False|||Enable turbulence simulation\.|
+|rtx.particles.localLightGain|float|0|||Lights particles of API materials \(rain, snow, dust\) directly with the sphere lights near them, such as headlights and lamps, without shadows\. The froxel cache that lights particles otherwise is too coarse to show a narrow beam in rain\. 1 is physical, 0 turns it off\.|
+|rtx.particles.localLightMaxCount|int|64|||The most sphere lights rtx\.particles\.localLightGain looks at for each particle hit, 1 to 256\. Lights past this count in the light list are ignored, so raise it in scenes with many lamps\.|
+|rtx.particles.localLightRangeMeters|float|40|||Sphere lights farther than this from a particle are skipped by rtx\.particles\.localLightGain, in meters\.|
 |rtx.particles.maxScreenCoverage|float|0|||Fades billboards that near the camera, starting at this size in screen heights and gone at twice that\. Cuts the cost of a camera inside a cloud of large particles, where each pixel otherwise passes through many of them\. 0 turns it off\.|
+|rtx.particles.minScreenSize|float|2|||Particles smaller than this on screen are not drawn, in pixels of the render resolution \(lower = small particles reach further, at more cost\)\.|
 |rtx.particles.timeScale|float|1|||Time modifier, can be used to slow/speed up time\.|
 |rtx.pathMaxBounces|int|4|0|15|The maximum number of indirect bounces the path will be allowed to complete\. Must be \< 16\.<br>Higher values result in better indirect lighting quality due to biasing the signal less, lower values result in better performance\.<br>Very high values are not recommended however as while long paths may be technically needed for unbiased rendering, in practice the contributions from higher bounces have diminishing returns\.<br>Environment variable: DXVK\_PATH\_TRACING\_MAX\_BOUNCES|
 |rtx.pathMinBounces|int|1|0|15|The minimum number of indirect bounces the path must complete before Russian Roulette can be used\. Must be \< 16\.<br>This value is recommended to stay fairly low \(1 for example\) as forcing longer paths when they carry little contribution quickly becomes detrimental to performance\.<br>Environment variable: DXVK\_PATH\_TRACING\_MIN\_BOUNCES|
@@ -1587,6 +1591,7 @@ This file is generated from the source by `scripts/gen_rtx_options_md.py`. Run `
 |rtx.wet.rainIntensity|float|1|0|1|Rain strength 0\.\.1: density and visibility of the raindrop rings \(only with rtx\.wet\.raindrops\)\.|
 |rtx.wet.rainShadow|bool|True|||Surfaces under a roof, bridge or canopy get no puddles and no raindrops\.|
 |rtx.wet.rainShadowDither|bool|False|||Quality 1: dithered rain shadow sample position \(needs DLSS\-RR to hide the grain\)\.|
+|rtx.wet.raindropDensity|float|4|1|8|Drops per grid axis, apart from their size: 4 = 16 times the drops of 1\. Scaled down in lighter rain\.|
 |rtx.wet.raindropDistance|float|35|0||Camera distance in world units up to which raindrop impacts are evaluated\.|
 |rtx.wet.raindropGroundScale|float|0.5|0|1|Strength of raindrop impacts on wet ground outside puddles, relative to inside puddles\.|
 |rtx.wet.raindropScale|float|3|0.1|10|Size of the raindrop rings \(the grid cell size is inverse to it\)\.|

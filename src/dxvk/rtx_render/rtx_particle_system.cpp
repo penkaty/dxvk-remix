@@ -205,6 +205,10 @@ namespace dxvk {
       RemixGui::Checkbox("Enable Spawning", &enableSpawningObject());
       RemixGui::DragFloat("Time Scale", &timeScaleObject(), 0.01f, 0.f, 1.f, "%.2f");
       RemixGui::DragFloat("Max Screen Coverage", &maxScreenCoverageObject(), 0.01f, 0.f, 16.f, "%.2f");
+      RemixGui::DragFloat("Min Screen Size", &minScreenSizeObject(), 0.05f, 0.f, 16.f, "%.2f px");
+      RemixGui::DragFloat("Local Light Gain", &localLightGainObject(), 0.01f, 0.f, 16.f, "%.2f");
+      RemixGui::DragFloat("Local Light Range", &localLightRangeMetersObject(), 0.5f, 1.f, 500.f, "%.0f m");
+      RemixGui::DragInt("Local Light Max Count", &localLightMaxCountObject(), 1.f, 1, 256);
 
       if (RemixGui::CollapsingHeader("Emitter Discontinuity Lerp Guard", ImGuiTreeNodeFlags_CollapsingHeader)) {
         ImGui::Indent();
