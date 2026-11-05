@@ -120,6 +120,11 @@ NUMOS `cloud_render` took 80-90 s to compile in the NVIDIA driver and 97 minutes
 The saved `.remix-pipeline-cache` was discarded whenever the runtime DLL changed, so every update compiled every Remix pipeline again, over 90 minutes on an RX 6700 XT. The file is now checked against the GPU and driver only, as the Vulkan pipeline cache data itself is: the driver keys each pipeline by its shader code and state, so an update compiles only the shaders it changed. Files saved by earlier builds load too. The `rtx.pipelineCache.maxSizeMB` cap still applies, so a cache that outgrows it across many updates is dropped and rebuilt.
 - Options: none.
 
+### Ray tracing waits for the TLAS build
+The barrier after the TLAS builds ordered them only against later acceleration structure builds, so ray tracing and compute ray queries could start reading a TLAS before its build finished. It now covers the ray tracing and compute shader stages, like the barriers after BLAS compaction. This is a candidate cause of a device loss on an AMD Radeon 610M on the first ray traced frame of a session (a read of an unmapped address in the first pass that traces); that is not yet confirmed.
+- Options: none.
+- Commits: the commit that adds this entry.
+
 ### NUMOS shaders compile in the background
 The prewarm wait screen no longer waits for the NUMOS passes, and frames no longer skip ray tracing while they compile. On an RX 6700 XT with a cold cache the wait screen stayed up 101 minutes, and closed one second after `cloud_render` finished. The NUMOS passes still start compiling at startup, but no frame waits for them. Until NUMOS's small core passes are ready the sky has no NUMOS sky, sun or moon, as when its shaders fail to load. Until the on-screen cloud pass is ready the directly visible sky has no clouds. Until the cloud dome pass is ready reflections and indirect light have no clouds. These passes are held back by switching off, for that frame only, the NUMOS settings that dispatch them, so NUMOS restarts their temporal history when they first run. The log names each held-back pass and when it becomes ready. The pipeline cache still saves only once no compile is in flight.
 - Options: none.
