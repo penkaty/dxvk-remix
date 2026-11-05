@@ -32,6 +32,9 @@ Entry format:
 
 The New Vegas RTX runtime is Remix Plus with the additions below, which the Fallout: New Vegas integration uses. The dated entries after this section are the Remix Plus trunk's, and this runtime shares only part of that history. It does not have the trunk's frontend interface rework (interface steps I1 to I6f), the input checks at the scene interface, game lights, external frame export, neural uplift or the stress mode.
 
+### Small particles in large world units are no longer dropped
+The geometry pass dropped every particle under 0.1 authored units as degenerate. With a scene scale of 1 in a game whose unit is a metre, that is 10 cm, so falling snow never showed. The guard now only drops degenerate sizes, and the existing screen-space test decides visibility.
+
 ### Rain map traced only when the camera moved; particles fade before they fill the screen; baked terrain can be picked
 The rain map's static geometry does not change frame to frame, so it can stay valid while the camera covers a few metres. Billboards that fill the screen are the worst case for a camera inside a cloud of large particles. Object picking now reports a baked terrain draw's game texture, not the baked map, so a click in the texture grid finds it.
 - Options: added `rtx.wet.mapUpdateDistance` (default 0, every frame) and `rtx.particles.maxScreenCoverage` (default off). Preset-independent: the game's config sets them.
