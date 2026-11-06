@@ -3441,7 +3441,7 @@ namespace dxvk {
       ImGui::EndTabItem();
     }
 
-    if (IMGUI_ADD_TOOLTIP(ImGui::BeginTabItem("Lamps", nullptr, tab_item_flags), "Attach lights to game meshes and save them as a mod")) {
+    if (IMGUI_ADD_TOOLTIP(ImGui::BeginTabItem("Lamps & Materials", nullptr, tab_item_flags), "Attach lights to game meshes, or give a mesh a material by hand, saved as a mod")) {
       spacing();
       showLampAuthoring(ctx);
       ImGui::EndTabItem();
@@ -3703,7 +3703,7 @@ namespace dxvk {
     }
 
     ImGui::Separator();
-    ImGui::TextUnformatted("Mesh materials");
+    if (ImGui::CollapsingHeader("Mesh materials: give a picked mesh a material by hand", ImGuiTreeNodeFlags_DefaultOpen)) {
     const std::vector<std::string>& library = authoring.library();
     std::vector<MeshMaterial>& meshMaterials = authoring.meshMaterials();
     if (library.empty()) {
@@ -3753,6 +3753,8 @@ namespace dxvk {
         meshMaterials.erase(meshMaterials.begin() + toClear);
         dirty = true;
       }
+    }
+
     }
 
     if (dirty && s_autoSave) {
