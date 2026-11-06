@@ -179,6 +179,7 @@ namespace dxvk {
     , m_bindlessResourceManager(device)
     , m_pReplacer(new AssetReplacer())
     , m_terrainBaker(new TerrainBaker())
+    , m_lightAuthoring(new LightAuthoring())
     , m_cameraManager(device)
     , m_uniqueObjectSearchDistance(RtxOptions::uniqueObjectDistance()) {
     InstanceEventHandler instanceEvents(this);
@@ -1591,7 +1592,11 @@ namespace dxvk {
           break;
         }
         if (replacement.lightData.has_value()) {
-          RtLight objectSpaceLight = replacement.lightData->toRtLight();
+          LightData lightData = replacement.lightData.value();
+          if (lightData.isAnimated()) {
+            lightData.applyAnimation(static_cast<double>(GlobalTime::get().absoluteTimeMs()) * 0.001);
+          }
+          RtLight objectSpaceLight = lightData.toRtLight();
 
           // Transform to world space for the actual light creation
           RtLight localLight = objectSpaceLight;
@@ -2281,13 +2286,14 @@ namespace dxvk {
       // A Remix API draw: no legacy textures, its albedo's hash rides on the draw.
       h = drawCallState.externalPickingTextureHash;
     }
-    trackObjectPickingMeta(objectPickingValue, h, drawCallState.getMaterialData().getColorTexture2().getImageHash());
+    trackObjectPickingMeta(objectPickingValue, h, drawCallState.getMaterialData().getColorTexture2().getImageHash(), &drawCallState);
   }
 
   void SceneManager::trackObjectPickingMeta(
       ObjectPickingValue objectPickingValue,
       XXH64_hash_t textureHash,
-      XXH64_hash_t textureHash2) {
+      XXH64_hash_t textureHash2,
+      const DrawCallState* pDrawCallState) {
     const bool objectPickingActive = m_device->getCommon()->getResources().getRaytracingOutput()
       .m_primaryObjectPicking.isValid();
     if (!objectPickingActive || !g_allowMappingLegacyHashToObjectPickingValue) {
@@ -2300,6 +2306,13 @@ namespace dxvk {
     }
     if (textureHash2 != kEmptyHash) {
       meta.legacyTextureHash2 = textureHash2;
+    }
+    if (pDrawCallState != nullptr) {
+      meta.meshHash = pDrawCallState->getHash(RtxOptions::geometryAssetHashRule());
+      meta.objectToWorld = pDrawCallState->getTransformData().objectToWorld;
+      const AxisAlignedBoundingBox& box = pDrawCallState->getGeometryData().boundingBox;
+      meta.boundsMin = box.minPos;
+      meta.boundsMax = box.maxPos;
     }
 
     std::lock_guard lock { m_drawCallMeta.mutex };
@@ -3054,6 +3067,25 @@ namespace dxvk {
     std::lock_guard lock { m_startInMediumMaterialMutex };
     m_pendingStartInMediumMaterial.reset();
     m_pendingClearStartInMediumMaterial = true;
+  }
+
+  std::optional<SceneManager::PickedDraw> SceneManager::findPickedDraw(uint32_t objectPickingValue) {
+    std::lock_guard lock { m_drawCallMeta.mutex };
+    const int ticksToCheck[] = {
+      m_drawCallMeta.ticker,
+      (m_drawCallMeta.ticker + m_drawCallMeta.MaxTicks - 1) % m_drawCallMeta.MaxTicks,
+    };
+    for (int tick : ticksToCheck) {
+      if (!m_drawCallMeta.ready[tick]) {
+        continue;
+      }
+      auto found = m_drawCallMeta.infos[tick].find(objectPickingValue);
+      if (found != m_drawCallMeta.infos[tick].end() && found->second.meshHash != kEmptyHash) {
+        const DrawCallMetaInfo& meta = found->second;
+        return PickedDraw { meta.meshHash, meta.legacyTextureHash, meta.objectToWorld, meta.boundsMin, meta.boundsMax };
+      }
+    }
+    return std::nullopt;
   }
 
   std::optional<XXH64_hash_t> SceneManager::findLegacyTextureHashByObjectPickingValue(uint32_t objectPickingValue) {

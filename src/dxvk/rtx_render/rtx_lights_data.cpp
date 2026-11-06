@@ -497,6 +497,62 @@ namespace dxvk {
     return attr;
   }
 
+  namespace {
+    Vector3 rotateHue(const Vector3& rgb, float turns) {
+      // Rodrigues rotation of the colour about the grey axis.
+      const float angle = turns * 2.f * kPi;
+      const float c = std::cos(angle);
+      const float s = std::sin(angle);
+      const Vector3 k = Vector3(1.f) * (1.f / std::sqrt(3.f));
+      const Vector3 rotated = rgb * c + cross(k, rgb) * s + k * (dot(k, rgb) * (1.f - c));
+      return Vector3(std::max(rotated.x, 0.f), std::max(rotated.y, 0.f), std::max(rotated.z, 0.f));
+    }
+
+    float hashToUnit(uint64_t x) {
+      x ^= x >> 33;
+      x *= 0xff51afd7ed558ccdull;
+      x ^= x >> 33;
+      x *= 0xc4ceb9fe1a85ec53ull;
+      x ^= x >> 33;
+      return static_cast<float>(x >> 40) / static_cast<float>(1ull << 24);
+    }
+  }
+
+  void LightData::applyAnimation(double timeSeconds) {
+    const Animation& a = m_animation;
+    const double cycles = timeSeconds * a.rate + a.phase;
+    const float cycle = static_cast<float>(cycles - std::floor(cycles));
+    switch (a.mode) {
+    case AnimationMode::None:
+      break;
+    case AnimationMode::Flash:
+    case AnimationMode::Strobe:
+      if (cycle >= a.duty) {
+        m_Color = a.colorB;
+      }
+      break;
+    case AnimationMode::Pulse: {
+      const float w = 0.5f - 0.5f * std::cos(cycle * 2.f * kPi);
+      m_Color = m_Color * (1.f - w) + a.colorB * w;
+      break;
+    }
+    case AnimationMode::HueCycle:
+      m_Color = rotateHue(m_Color, cycle);
+      break;
+    case AnimationMode::CameraFlash: {
+      // About half of the slots of length 1 / rate hold one flash of 60 ms at a random moment, different per light position.
+      const uint64_t slot = static_cast<uint64_t>(std::floor(cycles)) ^ (XXH64(&m_position, sizeof(m_position), 0) * 0x9E3779B97F4A7C15ull);
+      const bool flashes = hashToUnit(slot) < 0.5f;
+      const float start = hashToUnit(slot + 0x632BE59BD9B4E019ull) * 0.9f;
+      const float seconds = (cycle - start) / a.rate;
+      if (!flashes || seconds < 0.f || seconds > 0.06f) {
+        m_Color = a.colorB;
+      }
+      break;
+    }
+    }
+  }
+
   Vector3 LightData::calculateRadiance() const {
     Vector3 temperature(1.f);
     if (m_EnableColorTemp) {
@@ -615,6 +671,23 @@ namespace dxvk {
     // If this light is fully defined (i.e. a child light) then we need to use all attributes
     if (prim.GetSpecifier() == pxr::SdfSpecifier::SdfSpecifierDef) {
       m_dirty = m_allDirty;
+    }
+
+    {
+      int mode = 0;
+      prim.GetAttribute(pxr::TfToken("remix:animation:mode")).Get(&mode);
+      if (mode > 0 && mode <= static_cast<int>(AnimationMode::CameraFlash)) {
+        m_animation.mode = static_cast<AnimationMode>(mode);
+        prim.GetAttribute(pxr::TfToken("remix:animation:rate")).Get(&m_animation.rate);
+        prim.GetAttribute(pxr::TfToken("remix:animation:duty")).Get(&m_animation.duty);
+        prim.GetAttribute(pxr::TfToken("remix:animation:phase")).Get(&m_animation.phase);
+        pxr::GfVec3f colorB(0.f);
+        if (prim.GetAttribute(pxr::TfToken("remix:animation:colorB")).Get(&colorB)) {
+          m_animation.colorB = Vector3(colorB.data());
+        }
+        m_animation.rate = std::clamp(m_animation.rate, 0.001f, 100.f);
+        m_animation.duty = std::clamp(m_animation.duty, 0.f, 1.f);
+      }
     }
 
     // Warn about all fields that contain NaN.

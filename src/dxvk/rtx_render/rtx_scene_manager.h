@@ -54,6 +54,7 @@
 #include "rtx_mod_manager.h"
 #include "graph/rtx_graph_manager.h"
 #include "rtx_particle_system.h"
+#include "rtx_light_authoring.h"
 #include <d3d9types.h>
 
 namespace dxvk 
@@ -481,6 +482,17 @@ public:
   [[nodiscard]] SamplerIndex trackSampler(Rc<DxvkSampler> sampler);
 
   std::optional<XXH64_hash_t> findLegacyTextureHashByObjectPickingValue(uint32_t objectPickingValue);
+
+  // A picked draw: what a mesh replacement for it is keyed by, and where it is.
+  struct PickedDraw {
+    XXH64_hash_t meshHash { kEmptyHash };
+    XXH64_hash_t textureHash { kEmptyHash };
+    Matrix4 objectToWorld {};
+    Vector3 boundsMin { 0.f };
+    Vector3 boundsMax { 0.f };
+  };
+  std::optional<PickedDraw> findPickedDraw(uint32_t objectPickingValue);
+  LightAuthoring& getLightAuthoring() { return *m_lightAuthoring; }
   std::vector<ObjectPickingValue> gatherObjectPickingValuesByTextureHash(XXH64_hash_t texHash);
 
   // Replacement material hash tracking
@@ -640,7 +652,8 @@ private:
       ReplacementInstance* replacementInstance);
 
   void trackObjectPickingMeta(const DrawCallState& drawCallState, ObjectPickingValue objectPickingValue);
-  void trackObjectPickingMeta(ObjectPickingValue objectPickingValue, XXH64_hash_t textureHash, XXH64_hash_t textureHash2 = kEmptyHash);
+  void trackObjectPickingMeta(ObjectPickingValue objectPickingValue, XXH64_hash_t textureHash, XXH64_hash_t textureHash2 = kEmptyHash,
+                              const DrawCallState* pDrawCallState = nullptr);
 
   // Remix API draws: the picking value of the draw's instances -- the host's
   // (remixapi_InstanceInfoObjectPickingEXT) when it gave one, else the replacement instance's own
@@ -694,6 +707,7 @@ private:
   std::unique_ptr<AssetReplacer> m_pReplacer;
 
   std::unique_ptr<TerrainBaker> m_terrainBaker;
+  std::unique_ptr<LightAuthoring> m_lightAuthoring;
 
   FogState m_fog;
   fast_unordered_cache<FogState> m_fogStates;
@@ -728,6 +742,11 @@ private:
   struct DrawCallMetaInfo {
     XXH64_hash_t legacyTextureHash { kEmptyHash };
     XXH64_hash_t legacyTextureHash2 { kEmptyHash };
+    // Set for D3D9 draws only (findPickedDraw).
+    XXH64_hash_t meshHash { kEmptyHash };
+    Matrix4 objectToWorld {};
+    Vector3 boundsMin { 0.f };
+    Vector3 boundsMax { 0.f };
   };
   struct DrawCallMeta {
     constexpr static inline uint8_t MaxTicks = 2;

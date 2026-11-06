@@ -246,6 +246,7 @@ namespace dxvk {
     void showReflexLatencyStats();
 
     void showSetupWindow(const Rc<DxvkContext>& ctx);
+    void showLampAuthoring(const Rc<DxvkContext>& ctx);
 
     void showMaterialOptions();
 

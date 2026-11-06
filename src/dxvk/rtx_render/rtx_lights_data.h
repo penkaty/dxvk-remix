@@ -68,6 +68,29 @@ namespace dxvk {
     // Are we overriding an existing game light?
     bool lightOverride() const { return m_isOverrideLight; }
 
+    // Time animation of the light's colour and brightness, read from the remix:animation:* attributes.
+    // See documentation/LightAuthoring.md, section "Animation".
+    enum class AnimationMode : uint32_t {
+      None = 0,
+      Flash = 1,
+      Strobe = 2,
+      Pulse = 3,
+      HueCycle = 4,
+      CameraFlash = 5,
+    };
+    struct Animation {
+      AnimationMode mode = AnimationMode::None;
+      float rate = 1.f;
+      float duty = 0.5f;
+      float phase = 0.f;
+      Vector3 colorB = Vector3(0.f);
+    };
+    const Animation& animation() const { return m_animation; }
+    bool isAnimated() const { return m_animation.mode != AnimationMode::None; }
+
+    // Sets the colour and brightness for the time given in seconds.
+    void applyAnimation(double timeSeconds);
+
     void setTransform(const pxr::GfMatrix4f& localToObject) {
       extractTransform(&localToObject);
     }
@@ -138,6 +161,7 @@ namespace dxvk {
     float m_xScale = 1.f, m_yScale = 1.f, m_zScale = 1.f;
     const bool m_isOverrideLight = false;
     const bool m_isRelativeTransform = false;
+    Animation m_animation;
   };
 } // namespace dxvk
 

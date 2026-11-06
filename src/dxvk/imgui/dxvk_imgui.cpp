@@ -3441,8 +3441,214 @@ namespace dxvk {
       ImGui::EndTabItem();
     }
 
+    if (IMGUI_ADD_TOOLTIP(ImGui::BeginTabItem("Lamps", nullptr, tab_item_flags), "Attach lights to game meshes and save them as a mod")) {
+      spacing();
+      showLampAuthoring(ctx);
+      ImGui::EndTabItem();
+    }
+
     ImGui::PopItemWidth();
     ImGui::EndTabBar();
+  }
+
+  namespace lamp_pick {
+    std::atomic<bool> g_armed { false };
+    std::atomic<bool> g_ready { false };
+    std::atomic<uint32_t> g_value { 0 };
+
+    bool presetName(void* data, int i, const char** out) {
+      *out = static_cast<const std::vector<LampPreset>*>(data)->at(i).name;
+      return true;
+    }
+  }
+
+  void ImGUI::showLampAuthoring(const Rc<DxvkContext>& ctx) {
+    auto common = ctx->getCommonObjects();
+    SceneManager& sceneManager = common->getSceneManager();
+    LightAuthoring& authoring = sceneManager.getLightAuthoring();
+    authoring.ensureLoaded();
+    std::vector<AuthoredLamp>& lamps = authoring.lamps();
+    const std::vector<LampPreset>& presets = LightAuthoring::presets();
+    void* presetData = const_cast<std::vector<LampPreset>*>(&presets);
+
+    static int s_preset = 0;
+    static int s_selected = -1;
+    static bool s_autoSave = true;
+    bool dirty = false;
+
+    ImGui::TextWrapped("A lamp is a light attached to a game mesh. It moves with the mesh, and the game's mesh stays as it is. "
+                       "Lamps are saved in the mod %s, which Remix reloads whenever it is saved.", authoring.modFilePath().c_str());
+    if (!authoring.modFileExisted()) {
+      ImGui::TextColored(ImVec4(1.f, 0.8f, 0.3f, 1.f), "The lamp mod did not exist at game start: lamps saved now load at the next start.");
+    }
+    ImGui::Separator();
+
+    ImGui::Combo("Preset for new lamps", &s_preset, lamp_pick::presetName, presetData, static_cast<int>(presets.size()));
+
+    if (lamp_pick::g_armed) {
+      ImGui::TextColored(ImVec4(0.4f, 1.f, 0.4f, 1.f), "Click the lamp mesh in the scene, outside this window. Escape cancels.");
+      if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        lamp_pick::g_armed = false;
+      } else if (!ImGui::GetIO().WantCaptureMouse && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        lamp_pick::g_armed = false;
+        common->metaDebugView().ObjectPicking.request(
+          tovec2i(ImGui::GetMousePos()), tovec2i(ImGui::GetMousePos()) + Vector2i { 1, 1 },
+          [](std::vector<ObjectPickingValue>&& values, std::optional<XXH64_hash_t>) {
+            if (!values.empty()) {
+              lamp_pick::g_value = values[0];
+              lamp_pick::g_ready = true;
+            }
+          });
+      }
+    } else if (ImGui::Button("Add a lamp: pick a mesh")) {
+      lamp_pick::g_armed = true;
+    }
+
+    if (lamp_pick::g_ready.exchange(false)) {
+      if (auto picked = sceneManager.findPickedDraw(lamp_pick::g_value)) {
+        lamps.push_back(authoring.makeLamp(picked->meshHash, picked->textureHash, picked->objectToWorld,
+                                           picked->boundsMin, picked->boundsMax, RtxOptions::zUp(), presets[s_preset]));
+        s_selected = static_cast<int>(lamps.size()) - 1;
+        dirty = true;
+      } else {
+        Logger::warn("[LightAuthoring] The clicked object is not a game mesh (an API instance, or nothing): no lamp added.");
+      }
+    }
+
+    RemixGui::Checkbox("Save after every change", &s_autoSave);
+    ImGui::SameLine();
+    if (ImGui::Button("Save now")) {
+      authoring.save();
+    }
+    ImGui::TextWrapped("%s", authoring.status().c_str());
+    ImGui::Separator();
+
+    static const char* const kAnimationNames[] = { "None", "Flash (A / B)", "Strobe", "Pulse (gradient A to B)", "Hue cycle", "Camera flashes" };
+    const Vector3 cameraPosition = sceneManager.getCamera().getPosition(true);
+    int toDelete = -1;
+    for (int i = 0; i < static_cast<int>(lamps.size()) && toDelete < 0; ++i) {
+      AuthoredLamp& lamp = lamps[i];
+      ImGui::PushID(i);
+      const std::string label = str::format("mesh_", hashToString(lamp.meshHash), " / ", lamp.name);
+      if (s_selected == i) {
+        ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+      }
+      const bool open = ImGui::TreeNode(label.c_str());
+      if (ImGui::IsItemHovered() && lamp.textureHash != 0) {
+        common->metaDebugView().Highlighting.requestHighlighting(lamp.textureHash, HighlightColor::UI, ctx->getDevice()->getCurrentFrameId());
+      }
+      if (open) {
+        auto edited = [&]() { dirty = dirty || ImGui::IsItemDeactivatedAfterEdit(); };
+        int preset = -1;
+        if (ImGui::Combo("Apply preset", &preset, lamp_pick::presetName, presetData, static_cast<int>(presets.size())) && preset >= 0) {
+          LightAuthoring::applyPreset(presets[preset], lamp);
+          dirty = true;
+        }
+        ImGui::ColorEdit3("Colour", &lamp.color.x);
+        edited();
+        ImGui::DragFloat("Intensity", &lamp.intensity, std::max(lamp.intensity * 0.01f, 1.f), 0.f, 1e7f, "%.0f", ImGuiSliderFlags_Logarithmic);
+        edited();
+        ImGui::DragFloat("Radius (game units)", &lamp.radius, 0.005f, 0.001f, 10.f, "%.3f");
+        edited();
+        ImGui::DragFloat("Cone half angle (180 = all around)", &lamp.coneAngle, 0.5f, 1.f, 180.f, "%.1f");
+        edited();
+        ImGui::DragFloat("Cone softness", &lamp.coneSoftness, 0.005f, 0.f, 1.f, "%.3f");
+        edited();
+        ImGui::DragFloat("Volumetric scale", &lamp.volumetric, 0.01f, 0.f, 10.f, "%.2f");
+        edited();
+        ImGui::DragFloat3("Position (mesh space)", &lamp.position.x, 0.01f, -1e6f, 1e6f, "%.3f");
+        edited();
+        ImGui::DragFloat3("Direction (mesh space)", &lamp.direction.x, 0.01f, -1.f, 1.f, "%.3f");
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+          lamp.direction = length(lamp.direction) < 1e-4f ? Vector3(0.f, -1.f, 0.f) : normalize(lamp.direction);
+          dirty = true;
+        }
+        if (lamp.placementKnown) {
+          const Matrix4 worldToObject = inverse(lamp.objectToWorld);
+          if (ImGui::Button("Aim down")) {
+            const Vector3 worldDown = RtxOptions::zUp() ? Vector3(0.f, 0.f, -1.f) : Vector3(0.f, -1.f, 0.f);
+            const Vector4 d = worldToObject * Vector4(worldDown.x, worldDown.y, worldDown.z, 0.f);
+            lamp.direction = normalize(Vector3(d.x, d.y, d.z));
+            dirty = true;
+          }
+          ImGui::SameLine();
+          if (ImGui::Button("Move to camera")) {
+            const Vector4 p = worldToObject * Vector4(cameraPosition.x, cameraPosition.y, cameraPosition.z, 1.f);
+            lamp.position = Vector3(p.x, p.y, p.z);
+            dirty = true;
+          }
+          ImGui::SameLine();
+          if (ImGui::Button("Aim at camera")) {
+            const Vector4 p = worldToObject * Vector4(cameraPosition.x, cameraPosition.y, cameraPosition.z, 1.f);
+            const Vector3 to = Vector3(p.x, p.y, p.z) - lamp.position;
+            if (length(to) > 1e-3f) {
+              lamp.direction = normalize(to);
+              dirty = true;
+            }
+          }
+        } else {
+          ImGui::TextDisabled("Pick the mesh again in this session to use Aim down, Move to camera and Aim at camera.");
+        }
+        int mode = static_cast<int>(lamp.animationMode);
+        if (ImGui::Combo("Animation", &mode, kAnimationNames, IM_ARRAYSIZE(kAnimationNames))) {
+          lamp.animationMode = static_cast<uint32_t>(mode);
+          if (mode == 2) {
+            lamp.animationRate = 8.f;
+            lamp.animationDuty = 0.08f;
+          } else if (mode == 5) {
+            lamp.animationRate = 1.5f;
+          }
+          dirty = true;
+        }
+        if (lamp.animationMode != 0) {
+          ImGui::DragFloat("Rate (cycles per second)", &lamp.animationRate, 0.01f, 0.001f, 100.f, "%.3f");
+          edited();
+          if (lamp.animationMode == 1 || lamp.animationMode == 2) {
+            ImGui::DragFloat("Time on (part of a cycle)", &lamp.animationDuty, 0.005f, 0.f, 1.f, "%.3f");
+            edited();
+          }
+          ImGui::DragFloat("Phase (part of a cycle)", &lamp.animationPhase, 0.005f, 0.f, 1.f, "%.3f");
+          edited();
+          if (lamp.animationMode != 4) {
+            ImGui::ColorEdit3("Colour B (black = off)", &lamp.animationColorB.x);
+            edited();
+          }
+        }
+        if (ImGui::Button("Duplicate")) {
+          AuthoredLamp copy = lamp;
+          copy.name = lamp.name + "_" + std::to_string(lamps.size());
+          lamps.push_back(copy);
+          dirty = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Delete")) {
+          toDelete = i;
+        }
+        ImGui::TreePop();
+      }
+      ImGui::PopID();
+    }
+    if (toDelete >= 0) {
+      lamps.erase(lamps.begin() + toDelete);
+      s_selected = -1;
+      dirty = true;
+    }
+
+    if (!RtxOptions::lightConverter().empty()) {
+      ImGui::Separator();
+      ImGui::TextWrapped("Textures tagged 'Add Light to Textures' give one round light at each draw's centre, with global settings. "
+                         "Hover a hash to highlight it. For an aimed light, add a lamp on the same mesh.");
+      for (const XXH64_hash_t h : RtxOptions::lightConverter()) {
+        ImGui::BulletText("%s", hashToString(h).c_str());
+        if (ImGui::IsItemHovered()) {
+          common->metaDebugView().Highlighting.requestHighlighting(h, HighlightColor::UI, ctx->getDevice()->getCurrentFrameId());
+        }
+      }
+    }
+
+    if (dirty && s_autoSave) {
+      authoring.save();
+    }
   }
 
   void ImGUI::adjustStyleBackgroundAlpha(const float& alpha, ImGuiStyle* dst) {
