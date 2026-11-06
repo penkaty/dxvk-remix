@@ -32,6 +32,10 @@ Entry format:
 
 The New Vegas RTX runtime is Remix Plus with the additions below, which the Fallout: New Vegas integration uses. The dated entries after this section are the Remix Plus trunk's, and this runtime shares only part of that history. It does not have the trunk's frontend interface rework (interface steps I1 to I6f), the input checks at the scene interface, game lights, external frame export, neural uplift or the stress mode.
 
+### Card normals as a dome per card
+The card normal pointed from the card's center line outward in the card plane, so it flipped across that line and between neighbouring cards, and foliage shaded in steps. With the new option each card is shaded as a dome: facing the viewer at its center, rolling over to the card plane at its rim, so crossed cards around one trunk read as one round crown.
+- Options: added `rtx.cardNormals.dome` (default off) and `rtx.cardNormals.domeSpread` (default 1). Preset-independent: a shading model choice, not a quality trade-off.
+
 ### Nearby sphere lights light particles directly
 Particles of API materials took local light only from the froxel radiance cache, scaled by the consumer gain, so a narrow beam such as a headlight never showed in falling rain. With the new option on, the opacity lighting approximation adds the unshadowed light of sphere lights near each particle hit, cone shaping included. The minimum screen size option also gets its menu control.
 - Options: added `rtx.particles.localLightGain` (default 0, off), `rtx.particles.localLightRangeMeters` (default 40), `rtx.particles.localLightMaxCount` (default 64). Preset-independent: off unless a game's rtx.conf sets it.

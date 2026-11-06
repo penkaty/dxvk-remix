@@ -629,6 +629,12 @@ struct RaytraceArgs {
   float particleLocalLightRange;
   float particleLocalLightPad0;
 
+  // rtx.cardNormals.dome and rtx.cardNormals.domeSpread, see calcCardNormal in surface_interaction.slangh.
+  uint cardNormalsDome;
+  float cardNormalsDomeSpread;
+  float cardNormalsPad0;
+  float cardNormalsPad1;
+
   // NOTE: Add structs to the top section of RaytraceArgs, not the bottom.
   // NOTE: bool does not work in debug builds, use uint instead.
 };

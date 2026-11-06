@@ -261,6 +261,10 @@ void calcSpritesheetValues(
 // from the card's center to the hit point, mixed with world up. A rectangle split in two triangles has the diagonal as
 // its longest edge, so the midpoint of that edge is the card center; for crossed cards it lies on the trunk axis. The
 // result lies in the card plane and therefore reads the same from both sides of the card.
+// With rtx.cardNormals.dome the card is shaded as a dome instead: the card's facing side at its center, rolling over to
+// the in-plane direction at the rim (half the longest edge times rtx.cardNormals.domeSpread). The radial normal flips
+// across the card's center line and between neighbouring cards, which shades foliage in steps; the dome is continuous
+// inside a card, and crossed cards around one trunk read as one round crown.
 vec3 calcCardNormal(const vec3 worldPositions[3], const vec3 hitPosition, const vec3 fallbackNormal)
 {
   const vec3 up = cb.isZUp ? vec3(0.0f, 0.0f, 1.0f) : vec3(0.0f, 1.0f, 0.0f);
@@ -282,11 +286,26 @@ vec3 calcCardNormal(const vec3 worldPositions[3], const vec3 hitPosition, const 
     center = (worldPositions[2] + worldPositions[0]) * 0.5f;
   }
 
+  const float upWeight = saturate(cb.cardNormalsUpWeight);
+
+  if (cb.cardNormalsDome)
+  {
+    const float maxEdge = max(edge01, max(edge12, edge20));
+    const float radius = max(0.5f * sqrt(maxEdge) * max(cb.cardNormalsDomeSpread, 0.05f), 1e-4f);
+    vec3 rim = (hitPosition - center) / radius;
+    const float rimLength2 = dot(rim, rim);
+    if (rimLength2 > 1.0f)
+    {
+      rim *= rsqrt(rimLength2);
+    }
+    // fallbackNormal is the triangle normal flipped to the side the ray came from.
+    const vec3 dome = rim + fallbackNormal * sqrt(saturate(1.0f - dot(rim, rim)));
+    return safeNormalize(safeNormalize(dome, fallbackNormal) * (1.0f - upWeight) + up * upWeight, fallbackNormal);
+  }
+
   vec3 outward = hitPosition - center;
   outward -= dot(outward, up) * up;
   outward = safeNormalize(outward, up);
-
-  const float upWeight = saturate(cb.cardNormalsUpWeight);
 
   return safeNormalize(outward * (1.0f - upWeight) + up * upWeight, fallbackNormal);
 }
@@ -526,7 +545,7 @@ SurfaceInteraction surfaceInteractionCreate<let GenerateTangents : bool>(
     // rtx.cardNormalsKeepGeometryNormal is on; the card normal then only becomes the shading base normal.
     if (surface.useCardNormals)
     {
-      const vec3 cardInterpolatedNormal = calcCardNormal(worldPositions, hitPosition, triangleNormal);
+      const vec3 cardInterpolatedNormal = calcCardNormal(worldPositions, hitPosition, flippedTriangleNormal);
       if (cb.cardNormalsKeepGeometryNormal != 0)
       {
         cardShadingNormal = getBentNormal(flippedTriangleNormal, cardInterpolatedNormal, ray.direction);

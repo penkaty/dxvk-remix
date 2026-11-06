@@ -504,6 +504,11 @@ namespace dxvk {
       RTX_OPTION("rtx", bool, cardNormalsKeepGeometryNormal, true,
                  "CardNormals: keep the triangle normal as the geometry normal (ray offsets, shadow rays, cut-out continuation); the card normal shades only. "
                  "False = the card normal also bends the geometry normal (the original port).");
+      RTX_OPTION("rtx.cardNormals", bool, dome, false,
+                 "Shades each rtx.cardNormalsTextures card as a dome: facing the viewer at the card's center, rolling over to the card plane at its rim. "
+                 "Smooth inside a card and round on crossed cards. Off: the normal points from the card's center line outward, which flips at the center line and shades foliage in steps.");
+      RTX_OPTION("rtx.cardNormals", float, domeSpread, 1.0f,
+                 "Dome radius as a multiple of half the card's longest edge (0.05 to 4). Above 1 the rim leans less outward, which softens the seams between neighbouring cards.");
     };
 
     struct Displacement {

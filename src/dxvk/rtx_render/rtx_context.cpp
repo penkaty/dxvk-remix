@@ -2284,6 +2284,8 @@ namespace dxvk {
     constants.isZUp = RtxOptions::zUp();
     constants.cardNormalsUpWeight = RtxOptions::CardNormals::upWeight();
     constants.cardNormalsKeepGeometryNormal = RtxOptions::CardNormals::cardNormalsKeepGeometryNormal() ? 1 : 0;
+    constants.cardNormalsDome = RtxOptions::CardNormals::dome();
+    constants.cardNormalsDomeSpread = RtxOptions::CardNormals::domeSpread();
     fork_hooks::fillWetnessShaderParams(*this, constants);   // RBR-RTX: rtx.wet.* and the rain map window
     constants.enableCullingSecondaryRays = RtxOptions::enableCullingInSecondaryRays();
 
