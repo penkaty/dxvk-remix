@@ -1362,6 +1362,14 @@ bool UsdMod::Impl::processReplacement(Args& args) {
     args.meshes[0].categories = processCategoryFlags(componentPrim);
     std::optional<RtxParticleSystemDesc> particleSystem = processParticleSystem(args, componentPrim);
     args.meshes[0].particleSystem = particleSystem;
+
+    // A material bound to the root or its mesh child replaces the original draw's material (documentation/MeshMaterials.md).
+    auto [materialPathHash, materialData] = processMaterialUser(args, componentPrim);
+    if (materialData == nullptr && meshPrim.IsValid()) {
+      std::tie(materialPathHash, materialData) = processMaterialUser(args, args.rootPrim);
+    }
+    args.meshes[0].materialData = materialData;
+    args.meshes[0].materialPathHash = materialData != nullptr ? materialPathHash : kEmptyHash;
   }
   processReplacementRecursive(args, args.rootPrim, true);
 
@@ -1382,6 +1390,7 @@ bool UsdMod::Impl::processReplacement(Args& args) {
   // A particle system or category override on the original draw still counts as a change.
   if (args.meshes.size() == 1 && args.meshes[0].includeOriginal
       && !args.meshes[0].particleSystem.has_value()
+      && args.meshes[0].materialData == nullptr
       && args.meshes[0].categories.categoryExists.raw() == 0) {
     return false;
   }

@@ -32,6 +32,11 @@ Entry format:
 
 The New Vegas RTX runtime is Remix Plus with the additions below, which the Fallout: New Vegas integration uses. The dated entries after this section are the Remix Plus trunk's, and this runtime shares only part of that history. It does not have the trunk's frontend interface rework (interface steps I1 to I6f), the input checks at the scene interface, game lights, external frame export, neural uplift or the stress mode.
 
+### Materials bound to a mesh replace the original draw's material
+A game texture is often shared by very different meshes, so a texture-hash material cannot fit all of them. A `material:binding` on a mesh replacement that keeps the original draw now replaces that draw's material, with the game's colour texture merged in. The Lamps tab picks a mesh (the object under the mouse is highlighted while picking) and binds a material from `library.usda` in the lamp mod's folder.
+- Options: none.
+- Docs: [MeshMaterials.md](../documentation/MeshMaterials.md)
+
 ### Lamps tab: lights attached to game meshes, saved as a mod
 Lamps the game only fakes with emissive textures could be lit only by "Add Light to Textures" (one round light at the draw's centre, global settings, gone when the draw is culled). The new Lamps tab in Game Setup attaches aimed sphere lights to a picked mesh, with presets, colour, cone and animation (flash, strobe, pulse, hue cycle, camera flashes), and saves them as mesh-anchored lights in `rtx-remix/mods/authored_lights/mod.usda`, which hot-reloads. Object picking now also records each D3D9 draw's mesh hash, transform and bounds.
 - Options: none. Animation is read from the `remix:animation:*` attributes of a USD light; upstream runtimes ignore them and show the light static.

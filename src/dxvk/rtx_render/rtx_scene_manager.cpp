@@ -1552,8 +1552,18 @@ namespace dxvk {
           renderMaterialData = *replacement.materialData;
         }
 
+        // A material bound to a preserved original draw replaces its material for that draw only, with the game's
+        // colour texture merged in as a texture-hash replacement gets it.
+        MaterialData* pDrawMaterial = &renderMaterialData;
+        std::optional<MaterialData> originalOverride;
+        if (replacement.includeOriginal && replacement.materialData != nullptr) {
+          originalOverride.emplace(*replacement.materialData);
+          originalOverride->mergeLegacyMaterial(input->getMaterialData());
+          pDrawMaterial = &originalOverride.value();
+        }
+
         const RtxParticleSystemDesc* pParticleSystemDesc = replacement.particleSystem.has_value() ? &replacement.particleSystem.value() : nullptr;
-        instance = processDrawCallState(ctx, *newDrawCallState, renderMaterialData, *replacementInstance, getExistingInstance(i), pParticleSystemDesc);
+        instance = processDrawCallState(ctx, *newDrawCallState, *pDrawMaterial, *replacementInstance, getExistingInstance(i), pParticleSystemDesc);
       }
 
       if (instance != nullptr) {

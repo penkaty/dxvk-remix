@@ -3455,6 +3455,16 @@ namespace dxvk {
     std::atomic<bool> g_armed { false };
     std::atomic<bool> g_ready { false };
     std::atomic<uint32_t> g_value { 0 };
+    // The pick is for a mesh material rather than a lamp.
+    bool g_forMaterial = false;
+
+    // Highlights the object under the mouse while a pick is armed and the mouse is over the scene.
+    void highlightUnderMouse(const Rc<DxvkContext>& ctx) {
+      if (!ImGui::GetIO().WantCaptureMouse) {
+        ctx->getCommonObjects()->metaDebugView().Highlighting.requestHighlighting(
+          tovec2i(ImGui::GetMousePos()), HighlightColor::UI, ctx->getDevice()->getCurrentFrameId());
+      }
+    }
 
     bool presetName(void* data, int i, const char** out) {
       *out = static_cast<const std::vector<LampPreset>*>(data)->at(i).name;
@@ -3486,7 +3496,10 @@ namespace dxvk {
     ImGui::Combo("Preset for new lamps", &s_preset, lamp_pick::presetName, presetData, static_cast<int>(presets.size()));
 
     if (lamp_pick::g_armed) {
-      ImGui::TextColored(ImVec4(0.4f, 1.f, 0.4f, 1.f), "Click the lamp mesh in the scene, outside this window. Escape cancels.");
+      lamp_pick::highlightUnderMouse(ctx);
+      ImGui::TextColored(ImVec4(0.4f, 1.f, 0.4f, 1.f), lamp_pick::g_forMaterial
+        ? "Click the mesh for the material in the scene (the highlighted one), outside this window. Escape cancels."
+        : "Click the lamp mesh in the scene (the highlighted one), outside this window. Escape cancels.");
       if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
         lamp_pick::g_armed = false;
       } else if (!ImGui::GetIO().WantCaptureMouse && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
@@ -3502,10 +3515,22 @@ namespace dxvk {
       }
     } else if (ImGui::Button("Add a lamp: pick a mesh")) {
       lamp_pick::g_armed = true;
+      lamp_pick::g_forMaterial = false;
     }
 
+    static int s_libraryChoice = 0;
+    static XXH64_hash_t s_materialMesh = 0;
+    static XXH64_hash_t s_materialTexture = 0;
     if (lamp_pick::g_ready.exchange(false)) {
-      if (auto picked = sceneManager.findPickedDraw(lamp_pick::g_value)) {
+      const auto picked = sceneManager.findPickedDraw(lamp_pick::g_value);
+      if (lamp_pick::g_forMaterial) {
+        if (picked) {
+          s_materialMesh = picked->meshHash;
+          s_materialTexture = picked->textureHash;
+        } else {
+          Logger::warn("[LightAuthoring] The clicked object is not a game mesh (an API instance, or nothing): no mesh picked.");
+        }
+      } else if (picked) {
         lamps.push_back(authoring.makeLamp(picked->meshHash, picked->textureHash, picked->objectToWorld,
                                            picked->boundsMin, picked->boundsMax, RtxOptions::zUp(), presets[s_preset]));
         s_selected = static_cast<int>(lamps.size()) - 1;
@@ -3643,6 +3668,55 @@ namespace dxvk {
         if (ImGui::IsItemHovered()) {
           common->metaDebugView().Highlighting.requestHighlighting(h, HighlightColor::UI, ctx->getDevice()->getCurrentFrameId());
         }
+      }
+    }
+
+    ImGui::Separator();
+    ImGui::TextUnformatted("Mesh materials");
+    const std::vector<std::string>& library = authoring.library();
+    std::vector<MeshMaterial>& meshMaterials = authoring.meshMaterials();
+    if (library.empty()) {
+      ImGui::TextWrapped("No material library: put a %s with materials under /RootNode/Looks next to the mod file, then restart the game.",
+                         LightAuthoring::kLibraryFile);
+    } else {
+      ImGui::TextWrapped("A library material replaces the material of one mesh only, where its texture is shared with other meshes. "
+                         "The game's colour texture stays.");
+      auto libraryName = [](void* data, int i, const char** out) {
+        *out = static_cast<const std::vector<std::string>*>(data)->at(i).c_str();
+        return true;
+      };
+      void* libraryData = const_cast<std::vector<std::string>*>(&library);
+      s_libraryChoice = std::clamp(s_libraryChoice, 0, static_cast<int>(library.size()) - 1);
+      ImGui::Combo("Material", &s_libraryChoice, libraryName, libraryData, static_cast<int>(library.size()));
+      if (!lamp_pick::g_armed && ImGui::Button("Pick a mesh for the material")) {
+        lamp_pick::g_armed = true;
+        lamp_pick::g_forMaterial = true;
+      }
+      if (s_materialMesh != 0) {
+        ImGui::Text("Picked: mesh_%s", hashToString(s_materialMesh).c_str());
+        ImGui::SameLine();
+        if (ImGui::Button("Apply to this mesh")) {
+          authoring.setMeshMaterial(s_materialMesh, s_materialTexture, library[s_libraryChoice]);
+          dirty = true;
+        }
+      }
+      int toClear = -1;
+      for (int i = 0; i < static_cast<int>(meshMaterials.size()); ++i) {
+        ImGui::PushID(10000 + i);
+        const MeshMaterial& m = meshMaterials[i];
+        ImGui::BulletText("mesh_%s: %s", hashToString(m.meshHash).c_str(), m.material.c_str());
+        if (ImGui::IsItemHovered() && m.textureHash != 0) {
+          common->metaDebugView().Highlighting.requestHighlighting(m.textureHash, HighlightColor::UI, ctx->getDevice()->getCurrentFrameId());
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Remove")) {
+          toClear = i;
+        }
+        ImGui::PopID();
+      }
+      if (toClear >= 0) {
+        meshMaterials.erase(meshMaterials.begin() + toClear);
+        dirty = true;
       }
     }
 

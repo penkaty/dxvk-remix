@@ -17,6 +17,7 @@
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/usd/usd/attribute.h>
 #include <pxr/usd/usd/prim.h>
+#include <pxr/usd/usd/relationship.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/xformable.h>
 #include <pxr/usd/usdLux/sphereLight.h>
@@ -109,6 +110,20 @@ namespace dxvk {
     }
     m_loaded = true;
     const std::string path = modFilePath();
+
+    const std::string libraryPath = (std::filesystem::path(path).parent_path() / kLibraryFile).string();
+    if (std::filesystem::exists(libraryPath)) {
+      if (pxr::UsdStageRefPtr library = pxr::UsdStage::Open(libraryPath, pxr::UsdStage::LoadAll)) {
+        if (const pxr::UsdPrim looks = library->GetPrimAtPath(pxr::SdfPath("/RootNode/Looks"))) {
+          for (const pxr::UsdPrim& material : looks.GetChildren()) {
+            if (material.GetTypeName() == pxr::TfToken("Material")) {
+              m_library.push_back(material.GetName().GetString());
+            }
+          }
+        }
+      }
+    }
+
     m_modFileExisted = std::filesystem::exists(path);
     if (!m_modFileExisted) {
       m_status = "No lamps yet. The first save creates " + path + "; its lights load at the next game start.";
@@ -130,6 +145,16 @@ namespace dxvk {
         continue;
       }
       const XXH64_hash_t meshHash = std::strtoull(meshName.c_str() + std::strlen(kMeshPrefix), nullptr, 16);
+      pxr::SdfPathVector targets;
+      if (const pxr::UsdRelationship binding = mesh.GetRelationship(pxr::TfToken("material:binding")); binding && binding.GetTargets(&targets) && !targets.empty()) {
+        MeshMaterial assigned;
+        assigned.meshHash = meshHash;
+        assigned.material = targets.front().GetName();
+        std::string texture;
+        readAttr(mesh, "remix:authoring:textureHash", texture);
+        assigned.textureHash = std::strtoull(texture.c_str(), nullptr, 16);
+        m_meshMaterials.push_back(assigned);
+      }
       for (const pxr::UsdPrim& prim : mesh.GetChildren()) {
         if (!prim.IsA<pxr::UsdLuxSphereLight>() || prim.GetName().GetString().rfind(kLampPrefix, 0) != 0) {
           continue;
@@ -160,7 +185,7 @@ namespace dxvk {
         m_lamps.push_back(lamp);
       }
     }
-    m_status = str::format("Loaded ", m_lamps.size(), " lamp(s) from ", path);
+    m_status = str::format("Loaded ", m_lamps.size(), " lamp(s) and ", m_meshMaterials.size(), " mesh material(s) from ", path);
     Logger::info("[LightAuthoring] " + m_status);
   }
 
@@ -200,19 +225,54 @@ namespace dxvk {
     return lamp;
   }
 
+  void LightAuthoring::setMeshMaterial(XXH64_hash_t meshHash, XXH64_hash_t textureHash, const std::string& material) {
+    auto it = std::find_if(m_meshMaterials.begin(), m_meshMaterials.end(), [&](const MeshMaterial& m) { return m.meshHash == meshHash; });
+    if (material.empty()) {
+      if (it != m_meshMaterials.end()) {
+        m_meshMaterials.erase(it);
+      }
+      return;
+    }
+    if (it == m_meshMaterials.end()) {
+      m_meshMaterials.push_back(MeshMaterial { meshHash, textureHash, material });
+    } else {
+      it->material = material;
+    }
+  }
+
   bool LightAuthoring::save() {
     const std::string path = modFilePath();
     std::vector<XXH64_hash_t> meshes;
-    for (const AuthoredLamp& l : m_lamps) {
-      if (std::find(meshes.begin(), meshes.end(), l.meshHash) == meshes.end()) {
-        meshes.push_back(l.meshHash);
+    auto addMesh = [&](XXH64_hash_t h) {
+      if (std::find(meshes.begin(), meshes.end(), h) == meshes.end()) {
+        meshes.push_back(h);
       }
+    };
+    for (const AuthoredLamp& l : m_lamps) {
+      addMesh(l.meshHash);
     }
+    for (const MeshMaterial& m : m_meshMaterials) {
+      addMesh(m.meshHash);
+    }
+    const bool hasLibrary = std::filesystem::exists(std::filesystem::path(path).parent_path() / kLibraryFile);
+
     std::ostringstream o;
-    o << "#usda 1.0\n(\n    doc = \"Lights attached to game meshes, written by the Remix Lamps panel. Each mesh_ prim keeps the game's own mesh.\"\n)\n\n";
+    o << "#usda 1.0\n(\n    doc = \"Lights and materials attached to game meshes, written by the Remix Lamps panel. Each mesh_ prim keeps the game's own mesh.\"\n";
+    if (hasLibrary) {
+      o << "    subLayers = [\n        @./" << kLibraryFile << "@\n    ]\n";
+    }
+    o << ")\n\n";
     o << "def Xform \"RootNode\"\n{\n    def Scope \"meshes\"\n    {\n";
     for (XXH64_hash_t mesh : meshes) {
-      o << "        def Xform \"" << kMeshPrefix << hex16(mesh) << "\"\n        {\n";
+      auto material = std::find_if(m_meshMaterials.begin(), m_meshMaterials.end(), [&](const MeshMaterial& m) { return m.meshHash == mesh; });
+      const bool bound = material != m_meshMaterials.end() && hasLibrary;
+      o << "        def Xform \"" << kMeshPrefix << hex16(mesh) << "\"" << (bound ? " (\n            prepend apiSchemas = [\"MaterialBindingAPI\"]\n        )" : "") << "\n        {\n";
+      if (bound) {
+        o << "            rel material:binding = </RootNode/Looks/" << material->material << ">\n";
+        if (material->textureHash != 0) {
+          o << "            string remix:authoring:textureHash = \"" << hex16(material->textureHash) << "\"\n";
+        }
+      }
       for (const AuthoredLamp& l : m_lamps) {
         if (l.meshHash != mesh) {
           continue;
@@ -264,7 +324,7 @@ namespace dxvk {
       Logger::err("[LightAuthoring] " + m_status);
       return false;
     }
-    m_status = str::format("Saved ", m_lamps.size(), " lamp(s) on ", meshes.size(), " mesh(es) to ", path,
+    m_status = str::format("Saved ", m_lamps.size(), " lamp(s) and ", m_meshMaterials.size(), " mesh material(s) on ", meshes.size(), " mesh(es) to ", path,
                            m_modFileExisted ? "" : ". The mod is new: its lights load at the next game start.");
     Logger::info("[LightAuthoring] " + m_status);
     return true;

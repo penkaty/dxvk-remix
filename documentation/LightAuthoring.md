@@ -45,3 +45,7 @@ An animation is applied only while its mesh is drawn, so it pauses while an anti
 Presets set colour, intensity, radius, cone angle and softness (`LightAuthoring::presets`). Intensity is radiance per
 unit area of the sphere, so a larger radius at the same intensity gives more light. The values are starting points
 for tuning in the scene.
+
+## Mesh materials
+
+The same panel binds a material from `library.usda` to a picked mesh. See [MeshMaterials.md](MeshMaterials.md).

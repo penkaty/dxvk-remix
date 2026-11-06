@@ -37,6 +37,14 @@ namespace dxvk {
     Matrix4 objectToWorld {};
   };
 
+  // A library material bound to one game mesh, replacing its material on that mesh only.
+  // See documentation/MeshMaterials.md.
+  struct MeshMaterial {
+    XXH64_hash_t meshHash = 0;
+    XXH64_hash_t textureHash = 0;
+    std::string material;
+  };
+
   struct LampPreset {
     const char* name;
     Vector3 color;
@@ -62,6 +70,13 @@ namespace dxvk {
 
     std::vector<AuthoredLamp>& lamps() { return m_lamps; }
 
+    // The materials of library.usda next to the mod file, sublayered into it when it exists.
+    static constexpr const char* kLibraryFile = "library.usda";
+    const std::vector<std::string>& library() const { return m_library; }
+    std::vector<MeshMaterial>& meshMaterials() { return m_meshMaterials; }
+    // Binds a library material to a mesh. An empty name removes the mesh's material.
+    void setMeshMaterial(XXH64_hash_t meshHash, XXH64_hash_t textureHash, const std::string& material);
+
     // Returns a lamp for a picked mesh: below the mesh's bounds, aimed down in the world.
     AuthoredLamp makeLamp(XXH64_hash_t meshHash, XXH64_hash_t textureHash, const Matrix4& objectToWorld,
                           const Vector3& boundsMin, const Vector3& boundsMax, bool zUp, const LampPreset& preset);
@@ -77,6 +92,8 @@ namespace dxvk {
     bool m_loaded = false;
     bool m_modFileExisted = false;
     std::vector<AuthoredLamp> m_lamps;
+    std::vector<MeshMaterial> m_meshMaterials;
+    std::vector<std::string> m_library;
     std::string m_status;
   };
 
