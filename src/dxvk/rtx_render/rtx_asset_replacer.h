@@ -87,6 +87,9 @@ namespace dxvk {
     uint32_t pointInstanceIndex = kInvalidPointInstanceIndex; 
     Type type;
     bool includeOriginal = false;
+    // The replacement's lights are placed relative to the replaced draw's bounding box centre, so one texture-anchored
+    // replacement fits every mesh that uses the texture (documentation/MeshMaterials.md, Texture anchors).
+    bool boundsRelative = false;
 
     std::string primPath;
     XXH64_hash_t usdPathHash = kEmptyHash;
@@ -522,6 +525,10 @@ namespace dxvk {
 
     std::shared_ptr<const ReplacementBucket> getReplacementsForMesh(XXH64_hash_t hash);
     std::shared_ptr<const ReplacementBucket> getReplacementsForLight(XXH64_hash_t hash);
+
+    // The mesh table key of a /RootNode/textureMeshes/tex_<hash> replacement. It applies to draws of that texture that
+    // have no mesh replacement of their own.
+    static XXH64_hash_t textureAnchorKey(XXH64_hash_t textureHash) { return textureHash ^ 0x5445584D45534821ull; }
     std::shared_ptr<MaterialData> getReplacementMaterial(XXH64_hash_t hash);
 
     // process the replacement USD and create all the m_replacements entries.

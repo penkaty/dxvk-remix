@@ -32,9 +32,15 @@ namespace dxvk {
     float animationDuty = 0.5f;
     float animationPhase = 0.f;
     Vector3 animationColorB { 0.f };
-    // The mesh's object to world transform when it was picked in this session. Not saved.
+    // Every mesh drawn with textureHash gets this lamp, placed relative to that mesh's bounds centre.
+    bool byTexture = false;
+    // Distance the light sits along its beam from the lamp's position, to clear the lamp's own housing.
+    float beamOffset = 0.f;
+    // The mesh's object to world transform and bounds centre when it was picked in this session. Not saved.
     bool placementKnown = false;
     Matrix4 objectToWorld {};
+    bool centerKnown = false;
+    Vector3 pickedCenter { 0.f };
   };
 
   // A library material bound to one game mesh, replacing its material on that mesh only.
@@ -43,6 +49,8 @@ namespace dxvk {
     XXH64_hash_t meshHash = 0;
     XXH64_hash_t textureHash = 0;
     std::string material;
+    // Every mesh drawn with textureHash gets the material, not only meshHash.
+    bool byTexture = false;
   };
 
   struct LampPreset {
@@ -74,8 +82,10 @@ namespace dxvk {
     static constexpr const char* kLibraryFile = "library.usda";
     const std::vector<std::string>& library() const { return m_library; }
     std::vector<MeshMaterial>& meshMaterials() { return m_meshMaterials; }
-    // Binds a library material to a mesh. An empty name removes the mesh's material.
-    void setMeshMaterial(XXH64_hash_t meshHash, XXH64_hash_t textureHash, const std::string& material);
+    // Binds a library material to a mesh, or to every mesh with the texture. An empty name removes the binding.
+    void setMeshMaterial(XXH64_hash_t meshHash, XXH64_hash_t textureHash, bool byTexture, const std::string& material);
+    // Moves a lamp between its own mesh and every mesh with its texture, keeping it in place on the picked mesh.
+    static void setByTexture(AuthoredLamp& lamp, bool byTexture);
 
     // Returns a lamp for a picked mesh: below the mesh's bounds, aimed down in the world.
     AuthoredLamp makeLamp(XXH64_hash_t meshHash, XXH64_hash_t textureHash, const Matrix4& objectToWorld,
@@ -87,7 +97,7 @@ namespace dxvk {
     const std::string& status() const { return m_status; }
 
   private:
-    std::string uniqueName(XXH64_hash_t meshHash) const;
+    std::string uniqueName() const;
 
     bool m_loaded = false;
     bool m_modFileExisted = false;

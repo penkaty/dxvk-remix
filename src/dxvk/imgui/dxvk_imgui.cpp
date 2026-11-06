@@ -3476,6 +3476,12 @@ namespace dxvk {
     auto common = ctx->getCommonObjects();
     SceneManager& sceneManager = common->getSceneManager();
     LightAuthoring& authoring = sceneManager.getLightAuthoring();
+
+    // Reading or saving the lamp mod while Remix still loads mods makes the hot reload run against the initial load.
+    if (sceneManager.getAssetReplacer()->isReloadPending()) {
+      ImGui::TextColored(ImVec4(1.f, 0.8f, 0.3f, 1.f), "Mods are still loading. The Lamps panel opens when they are done.");
+      return;
+    }
     authoring.ensureLoaded();
     std::vector<AuthoredLamp>& lamps = authoring.lamps();
     const std::vector<LampPreset>& presets = LightAuthoring::presets();
@@ -3494,6 +3500,15 @@ namespace dxvk {
     ImGui::Separator();
 
     ImGui::Combo("Preset for new lamps", &s_preset, lamp_pick::presetName, presetData, static_cast<int>(presets.size()));
+    static int s_anchor = 0;
+    static const char* const kAnchorNames[] = { "Only the picked mesh", "Every mesh with the picked texture" };
+    ImGui::Combo("New lamps and materials go on", &s_anchor, kAnchorNames, IM_ARRAYSIZE(kAnchorNames));
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Every mesh with the texture: each mesh drawn with it gets the lamp, placed relative to that mesh's centre.\n"
+                        "A mesh with its own lamp or material keeps its own and gets none of the texture's.");
+    }
 
     if (lamp_pick::g_armed) {
       lamp_pick::highlightUnderMouse(ctx);
@@ -3533,6 +3548,7 @@ namespace dxvk {
       } else if (picked) {
         lamps.push_back(authoring.makeLamp(picked->meshHash, picked->textureHash, picked->objectToWorld,
                                            picked->boundsMin, picked->boundsMax, RtxOptions::zUp(), presets[s_preset]));
+        LightAuthoring::setByTexture(lamps.back(), s_anchor == 1);
         s_selected = static_cast<int>(lamps.size()) - 1;
         dirty = true;
       } else {
@@ -3554,7 +3570,9 @@ namespace dxvk {
     for (int i = 0; i < static_cast<int>(lamps.size()) && toDelete < 0; ++i) {
       AuthoredLamp& lamp = lamps[i];
       ImGui::PushID(i);
-      const std::string label = str::format("mesh_", hashToString(lamp.meshHash), " / ", lamp.name);
+      const std::string label = lamp.byTexture
+        ? str::format("every mesh with tex_", hashToString(lamp.textureHash), " / ", lamp.name)
+        : str::format("mesh_", hashToString(lamp.meshHash), " / ", lamp.name);
       if (s_selected == i) {
         ImGui::SetNextItemOpen(true, ImGuiCond_Once);
       }
@@ -3581,15 +3599,28 @@ namespace dxvk {
         edited();
         ImGui::DragFloat("Volumetric scale", &lamp.volumetric, 0.01f, 0.f, 10.f, "%.2f");
         edited();
-        ImGui::DragFloat3("Position (mesh space)", &lamp.position.x, 0.01f, -1e6f, 1e6f, "%.3f");
+        bool byTexture = lamp.byTexture;
+        if (lamp.textureHash != 0 && RemixGui::Checkbox("Every mesh with this texture", &byTexture)) {
+          LightAuthoring::setByTexture(lamp, byTexture);
+          dirty = true;
+        }
+        ImGui::DragFloat("Beam offset (along the beam, game units)", &lamp.beamOffset, 0.01f, -50.f, 50.f, "%.2f");
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("Moves the light along its beam, out of the lamp's housing so the mesh does not block it.");
+        }
+        edited();
+        ImGui::DragFloat3(lamp.byTexture ? "Position (from each mesh's centre)" : "Position (mesh space)", &lamp.position.x, 0.01f, -1e6f, 1e6f, "%.3f");
         edited();
         ImGui::DragFloat3("Direction (mesh space)", &lamp.direction.x, 0.01f, -1.f, 1.f, "%.3f");
         if (ImGui::IsItemDeactivatedAfterEdit()) {
           lamp.direction = length(lamp.direction) < 1e-4f ? Vector3(0.f, -1.f, 0.f) : normalize(lamp.direction);
           dirty = true;
         }
-        if (lamp.placementKnown) {
-          const Matrix4 worldToObject = inverse(lamp.objectToWorld);
+        if (lamp.placementKnown && (!lamp.byTexture || lamp.centerKnown)) {
+          // A texture lamp's position is measured from the mesh's centre, so the picked mesh's centre is taken off.
+          const Matrix4 worldToObject = lamp.byTexture
+            ? translationMatrix(lamp.pickedCenter * -1.f) * inverse(lamp.objectToWorld)
+            : inverse(lamp.objectToWorld);
           if (ImGui::Button("Aim down")) {
             const Vector3 worldDown = RtxOptions::zUp() ? Vector3(0.f, 0.f, -1.f) : Vector3(0.f, -1.f, 0.f);
             const Vector4 d = worldToObject * Vector4(worldDown.x, worldDown.y, worldDown.z, 0.f);
@@ -3695,8 +3726,8 @@ namespace dxvk {
       if (s_materialMesh != 0) {
         ImGui::Text("Picked: mesh_%s", hashToString(s_materialMesh).c_str());
         ImGui::SameLine();
-        if (ImGui::Button("Apply to this mesh")) {
-          authoring.setMeshMaterial(s_materialMesh, s_materialTexture, library[s_libraryChoice]);
+        if (ImGui::Button(s_anchor == 1 ? "Apply to every mesh with its texture" : "Apply to this mesh")) {
+          authoring.setMeshMaterial(s_materialMesh, s_materialTexture, s_anchor == 1, library[s_libraryChoice]);
           dirty = true;
         }
       }
@@ -3704,7 +3735,11 @@ namespace dxvk {
       for (int i = 0; i < static_cast<int>(meshMaterials.size()); ++i) {
         ImGui::PushID(10000 + i);
         const MeshMaterial& m = meshMaterials[i];
-        ImGui::BulletText("mesh_%s: %s", hashToString(m.meshHash).c_str(), m.material.c_str());
+        if (m.byTexture) {
+          ImGui::BulletText("every mesh with tex_%s: %s", hashToString(m.textureHash).c_str(), m.material.c_str());
+        } else {
+          ImGui::BulletText("mesh_%s: %s", hashToString(m.meshHash).c_str(), m.material.c_str());
+        }
         if (ImGui::IsItemHovered() && m.textureHash != 0) {
           common->metaDebugView().Highlighting.requestHighlighting(m.textureHash, HighlightColor::UI, ctx->getDevice()->getCurrentFrameId());
         }

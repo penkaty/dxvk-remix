@@ -479,6 +479,7 @@ void classifyChangedPath(const pxr::SdfPath& path, bool isResync, const pxr::Usd
   static const pxr::SdfPath kMeshSection("/RootNode/meshes");
   static const pxr::SdfPath kLooksSection("/RootNode/Looks");
   static const pxr::SdfPath kLightsSection("/RootNode/lights");
+  static const pxr::SdfPath kTextureMeshSection("/RootNode/textureMeshes");
 
   static const char* kMeshPrefix  = lss::prefix::mesh.c_str();
   static const size_t kMeshLen    = lss::prefix::mesh.size();
@@ -515,6 +516,12 @@ void classifyChangedPath(const pxr::SdfPath& path, bool isResync, const pxr::Usd
     return;
   }
   const pxr::SdfPath& sectionPath = prefixes[1];
+
+  // Texture-anchored replacements are keyed apart from their prim names, so any change there reprocesses all meshes.
+  if (sectionPath == kTextureMeshSection) {
+    rebuildAllMeshes = true;
+    return;
+  }
 
   // size==2 means the section folder itself changed. For a resync (structural change)
   // we don't know which children were affected; for an info-only change the section
@@ -2039,6 +2046,36 @@ bool UsdMod::Impl::processUSD(const Rc<DxvkContext>& context, AssetReplacements&
       // Note: Update the state progress only every 16 meshes to reduce the number of atomic writes.
       if ((++currentMeshCount & 0b1111u) == 0u) {
         setProgress(ProgressState::ProcessingMeshes, currentMeshCount);
+      }
+    }
+  }
+
+  // Process texture-anchored replacements: /RootNode/textureMeshes/tex_<texture hash>. Each applies to every draw of
+  // that texture without a mesh replacement of its own (documentation/MeshMaterials.md, Texture anchors).
+  pxr::UsdPrim textureMeshes = stage->GetPrimAtPath(pxr::SdfPath("/RootNode/textureMeshes"));
+  if (pDirtyMeshHashes == nullptr && textureMeshes.IsValid()) {
+    static const std::string kTexPrefix = "tex_";
+    static const pxr::TfToken kBoundsCenter("remix:anchor:boundsCenter");
+    for (pxr::UsdPrim child : textureMeshes.GetFilteredChildren(pxr::UsdPrimIsActive)) {
+      if (isShuttingDown()) {
+        return false;
+      }
+      const XXH64_hash_t textureHash = getNamedHash(child.GetName().GetString(), kTexPrefix.c_str(), kTexPrefix.size());
+      if (textureHash == 0) {
+        continue;
+      }
+      std::vector<AssetReplacement> replacementVec;
+      Args args = {context, xformCache, child, replacementVec};
+      args.target = &target;
+      if (processReplacement(args)) {
+        bool boundsCenter = false;
+        if (const pxr::UsdAttribute a = child.GetAttribute(kBoundsCenter)) {
+          a.Get(&boundsCenter);
+        }
+        for (AssetReplacement& r : replacementVec) {
+          r.boundsRelative = boundsCenter;
+        }
+        publishMeshReplacement(args, AssetReplacer::textureAnchorKey(textureHash), replacementVec);
       }
     }
   }

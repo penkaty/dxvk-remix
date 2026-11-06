@@ -1097,6 +1097,9 @@ namespace dxvk {
         }
       }
     }
+    if (!pReplacements) {
+      pReplacements = m_pReplacer->getReplacementsForMesh(AssetReplacer::textureAnchorKey(input.getMaterialData().getHash()));
+    }
 
     ReplacementInstance* replacementInstance = m_drawCallTracker.findOrCreateReplacementInstance(
         input, m_rayPortalManager, overrideMaterialData, pReplacements != nullptr);
@@ -1619,6 +1622,9 @@ namespace dxvk {
               "[HostInstancing] A mesh replacement with lights replaces a draw that the host GPU-instances:"
               " its lights are placed once, at the first instance, not per instance."));
             localLight.applyTransform(inputTransforms.objectToWorld * (*inputTransforms.instancesToObject)[0]);
+          } else if (replacement.boundsRelative) {
+            const AxisAlignedBoundingBox& box = input->getGeometryData().boundingBox;
+            localLight.applyTransform(inputTransforms.objectToWorld * translationMatrix((box.minPos + box.maxPos) * 0.5f));
           } else {
             localLight.applyTransform(inputTransforms.objectToWorld);
           }

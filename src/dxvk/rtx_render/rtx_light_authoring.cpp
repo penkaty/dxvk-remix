@@ -27,6 +27,7 @@ namespace dxvk {
 
   namespace {
     constexpr const char* kMeshPrefix = "mesh_";
+    constexpr const char* kTexturePrefix = "tex_";
     constexpr const char* kLampPrefix = "authoredLight_";
 
     std::string hex16(XXH64_hash_t h) {
@@ -49,13 +50,14 @@ namespace dxvk {
     // Rows x, y, z and translation. The light emits along -z (USD convention), so z = -direction.
     std::string lampMatrix(const AuthoredLamp& lamp) {
       const Vector3 z = normalize(lamp.direction) * -1.f;
+    const Vector3 emitAt = lamp.position + normalize(lamp.direction) * lamp.beamOffset;
       const Vector3 helper = std::fabs(z.y) < 0.99f ? Vector3(0.f, 1.f, 0.f) : Vector3(1.f, 0.f, 0.f);
       const Vector3 x = normalize(cross(helper, z));
       const Vector3 y = cross(z, x);
       auto row = [](const Vector3& v, float w) {
         return "(" + num(v.x) + ", " + num(v.y) + ", " + num(v.z) + ", " + num(w) + ")";
       };
-      return "( " + row(x, 0.f) + ", " + row(y, 0.f) + ", " + row(z, 0.f) + ", " + row(lamp.position, 1.f) + " )";
+      return "( " + row(x, 0.f) + ", " + row(y, 0.f) + ", " + row(z, 0.f) + ", " + row(emitAt, 1.f) + " )";
     }
 
     template <class T>
@@ -135,24 +137,31 @@ namespace dxvk {
       Logger::err("[LightAuthoring] " + m_status);
       return;
     }
-    const pxr::UsdPrim meshes = stage->GetPrimAtPath(pxr::SdfPath("/RootNode/meshes"));
+    for (const bool byTexture : { false, true }) {
+    const pxr::UsdPrim meshes = stage->GetPrimAtPath(pxr::SdfPath(byTexture ? "/RootNode/textureMeshes" : "/RootNode/meshes"));
     if (!meshes) {
-      return;
+      continue;
     }
+    const char* const prefix = byTexture ? kTexturePrefix : kMeshPrefix;
     for (const pxr::UsdPrim& mesh : meshes.GetChildren()) {
       const std::string meshName = mesh.GetName().GetString();
-      if (meshName.rfind(kMeshPrefix, 0) != 0) {
+      if (meshName.rfind(prefix, 0) != 0) {
         continue;
       }
-      const XXH64_hash_t meshHash = std::strtoull(meshName.c_str() + std::strlen(kMeshPrefix), nullptr, 16);
+      // A mesh_ prim is keyed by its mesh, a tex_ prim by its texture. Each records the other as authoring data.
+      const XXH64_hash_t key = std::strtoull(meshName.c_str() + std::strlen(prefix), nullptr, 16);
+      std::string other;
+      readAttr(mesh, byTexture ? "remix:authoring:meshHash" : "remix:authoring:textureHash", other);
+      const XXH64_hash_t otherHash = std::strtoull(other.c_str(), nullptr, 16);
+      const XXH64_hash_t meshHash = byTexture ? otherHash : key;
+      const XXH64_hash_t textureHash = byTexture ? key : otherHash;
       pxr::SdfPathVector targets;
       if (const pxr::UsdRelationship binding = mesh.GetRelationship(pxr::TfToken("material:binding")); binding && binding.GetTargets(&targets) && !targets.empty()) {
         MeshMaterial assigned;
         assigned.meshHash = meshHash;
+        assigned.textureHash = textureHash;
         assigned.material = targets.front().GetName();
-        std::string texture;
-        readAttr(mesh, "remix:authoring:textureHash", texture);
-        assigned.textureHash = std::strtoull(texture.c_str(), nullptr, 16);
+        assigned.byTexture = byTexture;
         m_meshMaterials.push_back(assigned);
       }
       for (const pxr::UsdPrim& prim : mesh.GetChildren()) {
@@ -161,10 +170,17 @@ namespace dxvk {
         }
         AuthoredLamp lamp;
         lamp.meshHash = meshHash;
+        lamp.textureHash = textureHash;
+        lamp.byTexture = byTexture;
         lamp.name = prim.GetName().GetString();
-        std::string texture;
-        readAttr(prim, "remix:authoring:textureHash", texture);
-        lamp.textureHash = std::strtoull(texture.c_str(), nullptr, 16);
+        if (!byTexture) {
+          std::string texture;
+          readAttr(prim, "remix:authoring:textureHash", texture);
+          if (!texture.empty()) {
+            lamp.textureHash = std::strtoull(texture.c_str(), nullptr, 16);
+          }
+        }
+        readAttr(prim, "remix:authoring:beamOffset", lamp.beamOffset);
         readVec(prim, "inputs:color", lamp.color);
         readAttr(prim, "inputs:intensity", lamp.intensity);
         readAttr(prim, "inputs:radius", lamp.radius);
@@ -182,18 +198,22 @@ namespace dxvk {
         readAttr(prim, "xformOp:transform", m);
         lamp.position = Vector3(static_cast<float>(m[3][0]), static_cast<float>(m[3][1]), static_cast<float>(m[3][2]));
         lamp.direction = normalize(Vector3(static_cast<float>(-m[2][0]), static_cast<float>(-m[2][1]), static_cast<float>(-m[2][2])));
+        // The file holds the emitting position, which is the lamp's position moved along the beam.
+        lamp.position = lamp.position - lamp.direction * lamp.beamOffset;
         m_lamps.push_back(lamp);
       }
+    }
     }
     m_status = str::format("Loaded ", m_lamps.size(), " lamp(s) and ", m_meshMaterials.size(), " mesh material(s) from ", path);
     Logger::info("[LightAuthoring] " + m_status);
   }
 
-  std::string LightAuthoring::uniqueName(XXH64_hash_t meshHash) const {
+  // Names are unique in the whole file, because a texture's prim gathers the lamps of several meshes.
+  std::string LightAuthoring::uniqueName() const {
     for (uint32_t i = 0;; ++i) {
       const std::string name = kLampPrefix + std::to_string(i);
       const bool used = std::any_of(m_lamps.begin(), m_lamps.end(),
-        [&](const AuthoredLamp& l) { return l.meshHash == meshHash && l.name == name; });
+        [&](const AuthoredLamp& l) { return l.name == name; });
       if (!used) {
         return name;
       }
@@ -205,7 +225,7 @@ namespace dxvk {
     AuthoredLamp lamp;
     lamp.meshHash = meshHash;
     lamp.textureHash = textureHash;
-    lamp.name = uniqueName(meshHash);
+    lamp.name = uniqueName();
     applyPreset(preset, lamp);
     lamp.placementKnown = true;
     lamp.objectToWorld = objectToWorld;
@@ -221,12 +241,16 @@ namespace dxvk {
       const Vector3 half = (boundsMax - boundsMin) * 0.5f;
       const float reach = std::fabs(half.x * lamp.direction.x) + std::fabs(half.y * lamp.direction.y) + std::fabs(half.z * lamp.direction.z);
       lamp.position = center + lamp.direction * (reach + lamp.radius + 0.02f);
+      lamp.centerKnown = true;
+      lamp.pickedCenter = center;
     }
     return lamp;
   }
 
-  void LightAuthoring::setMeshMaterial(XXH64_hash_t meshHash, XXH64_hash_t textureHash, const std::string& material) {
-    auto it = std::find_if(m_meshMaterials.begin(), m_meshMaterials.end(), [&](const MeshMaterial& m) { return m.meshHash == meshHash; });
+  void LightAuthoring::setMeshMaterial(XXH64_hash_t meshHash, XXH64_hash_t textureHash, bool byTexture, const std::string& material) {
+    auto it = std::find_if(m_meshMaterials.begin(), m_meshMaterials.end(), [&](const MeshMaterial& m) {
+      return m.byTexture == byTexture && (byTexture ? m.textureHash == textureHash : m.meshHash == meshHash);
+    });
     if (material.empty()) {
       if (it != m_meshMaterials.end()) {
         m_meshMaterials.erase(it);
@@ -234,77 +258,116 @@ namespace dxvk {
       return;
     }
     if (it == m_meshMaterials.end()) {
-      m_meshMaterials.push_back(MeshMaterial { meshHash, textureHash, material });
+      m_meshMaterials.push_back(MeshMaterial { meshHash, textureHash, material, byTexture });
     } else {
       it->material = material;
+      it->meshHash = meshHash;
     }
+  }
+
+  void LightAuthoring::setByTexture(AuthoredLamp& lamp, bool byTexture) {
+    if (lamp.byTexture == byTexture || lamp.textureHash == 0) {
+      return;
+    }
+    // A texture lamp's position is relative to each mesh's bounds centre (Remix adds the centre per draw).
+    if (lamp.centerKnown) {
+      lamp.position = byTexture ? lamp.position - lamp.pickedCenter : lamp.position + lamp.pickedCenter;
+    }
+    lamp.byTexture = byTexture;
   }
 
   bool LightAuthoring::save() {
     const std::string path = modFilePath();
-    std::vector<XXH64_hash_t> meshes;
-    auto addMesh = [&](XXH64_hash_t h) {
-      if (std::find(meshes.begin(), meshes.end(), h) == meshes.end()) {
-        meshes.push_back(h);
+    const bool hasLibrary = std::filesystem::exists(std::filesystem::path(path).parent_path() / kLibraryFile);
+
+    // One prim per key: a mesh hash under meshes, a texture hash under textureMeshes.
+    auto keyOf = [](bool byTexture, XXH64_hash_t meshHash, XXH64_hash_t textureHash) { return byTexture ? textureHash : meshHash; };
+    std::vector<XXH64_hash_t> keys[2];
+    auto addKey = [&](bool byTexture, XXH64_hash_t key) {
+      std::vector<XXH64_hash_t>& list = keys[byTexture ? 1 : 0];
+      if (key != 0 && std::find(list.begin(), list.end(), key) == list.end()) {
+        list.push_back(key);
       }
     };
     for (const AuthoredLamp& l : m_lamps) {
-      addMesh(l.meshHash);
+      addKey(l.byTexture, keyOf(l.byTexture, l.meshHash, l.textureHash));
     }
     for (const MeshMaterial& m : m_meshMaterials) {
-      addMesh(m.meshHash);
+      addKey(m.byTexture, keyOf(m.byTexture, m.meshHash, m.textureHash));
     }
-    const bool hasLibrary = std::filesystem::exists(std::filesystem::path(path).parent_path() / kLibraryFile);
 
     std::ostringstream o;
-    o << "#usda 1.0\n(\n    doc = \"Lights and materials attached to game meshes, written by the Remix Lamps panel. Each mesh_ prim keeps the game's own mesh.\"\n";
+    o << "#usda 1.0\n(\n    doc = \"Lights and materials attached to game meshes, written by the Remix Lamps panel. Each mesh_ and tex_ prim keeps the game's own mesh.\"\n";
     if (hasLibrary) {
       o << "    subLayers = [\n        @./" << kLibraryFile << "@\n    ]\n";
     }
     o << ")\n\n";
-    o << "def Xform \"RootNode\"\n{\n    def Scope \"meshes\"\n    {\n";
-    for (XXH64_hash_t mesh : meshes) {
-      auto material = std::find_if(m_meshMaterials.begin(), m_meshMaterials.end(), [&](const MeshMaterial& m) { return m.meshHash == mesh; });
-      const bool bound = material != m_meshMaterials.end() && hasLibrary;
-      o << "        def Xform \"" << kMeshPrefix << hex16(mesh) << "\"" << (bound ? " (\n            prepend apiSchemas = [\"MaterialBindingAPI\"]\n        )" : "") << "\n        {\n";
-      if (bound) {
-        o << "            rel material:binding = </RootNode/Looks/" << material->material << ">\n";
-        if (material->textureHash != 0) {
-          o << "            string remix:authoring:textureHash = \"" << hex16(material->textureHash) << "\"\n";
+    o << "def Xform \"RootNode\"\n{\n";
+    for (const bool byTexture : { false, true }) {
+      o << "    def Scope \"" << (byTexture ? "textureMeshes" : "meshes") << "\"\n    {\n";
+      for (XXH64_hash_t key : keys[byTexture ? 1 : 0]) {
+        auto material = std::find_if(m_meshMaterials.begin(), m_meshMaterials.end(), [&](const MeshMaterial& m) {
+          return m.byTexture == byTexture && keyOf(byTexture, m.meshHash, m.textureHash) == key;
+        });
+        const bool bound = material != m_meshMaterials.end() && hasLibrary;
+        o << "        def Xform \"" << (byTexture ? kTexturePrefix : kMeshPrefix) << hex16(key) << "\""
+          << (bound ? " (\n            prepend apiSchemas = [\"MaterialBindingAPI\"]\n        )" : "") << "\n        {\n";
+        if (byTexture) {
+          o << "            bool remix:anchor:boundsCenter = 1\n";
         }
+        if (bound) {
+          o << "            rel material:binding = </RootNode/Looks/" << material->material << ">\n";
+        }
+        // The hash the prim is not keyed by, kept for highlighting and for switching the anchor.
+        XXH64_hash_t other = 0;
+        for (const AuthoredLamp& l : m_lamps) {
+          if (l.byTexture == byTexture && keyOf(byTexture, l.meshHash, l.textureHash) == key) {
+            other = byTexture ? l.meshHash : l.textureHash;
+          }
+        }
+        if (bound) {
+          other = byTexture ? material->meshHash : material->textureHash;
+        }
+        if (other != 0) {
+          o << "            string " << (byTexture ? "remix:authoring:meshHash" : "remix:authoring:textureHash") << " = \"" << hex16(other) << "\"\n";
+        }
+        for (const AuthoredLamp& l : m_lamps) {
+          if (l.byTexture != byTexture || keyOf(byTexture, l.meshHash, l.textureHash) != key) {
+            continue;
+          }
+          const bool shaped = l.coneAngle < 179.9f;
+          o << "            def SphereLight \"" << l.name << "\"" << (shaped ? " (\n                prepend apiSchemas = [\"ShapingAPI\"]\n            )" : "") << "\n            {\n";
+          o << "                color3f inputs:color = " << vec(l.color) << "\n";
+          o << "                float inputs:intensity = " << num(l.intensity) << "\n";
+          o << "                float inputs:radius = " << num(l.radius) << "\n";
+          if (shaped) {
+            o << "                float inputs:shaping:cone:angle = " << num(l.coneAngle) << "\n";
+            o << "                float inputs:shaping:cone:softness = " << num(l.coneSoftness) << "\n";
+          }
+          o << "                float inputs:volumetric_radiance_scale = " << num(l.volumetric) << "\n";
+          if (l.animationMode != 0) {
+            o << "                int remix:animation:mode = " << l.animationMode << "\n";
+            o << "                float remix:animation:rate = " << num(l.animationRate) << "\n";
+            o << "                float remix:animation:duty = " << num(l.animationDuty) << "\n";
+            o << "                float remix:animation:phase = " << num(l.animationPhase) << "\n";
+            o << "                color3f remix:animation:colorB = " << vec(l.animationColorB) << "\n";
+          }
+          if (l.beamOffset != 0.f) {
+            o << "                float remix:authoring:beamOffset = " << num(l.beamOffset) << "\n";
+          }
+          if (!byTexture && l.textureHash != 0) {
+            o << "                string remix:authoring:textureHash = \"" << hex16(l.textureHash) << "\"\n";
+          }
+          o << "                matrix4d xformOp:transform = " << lampMatrix(l) << "\n";
+          o << "                uniform token[] xformOpOrder = [\"xformOp:transform\"]\n";
+          o << "            }\n";
+        }
+        o << "        }\n";
       }
-      for (const AuthoredLamp& l : m_lamps) {
-        if (l.meshHash != mesh) {
-          continue;
-        }
-        const bool shaped = l.coneAngle < 179.9f;
-        o << "            def SphereLight \"" << l.name << "\"" << (shaped ? " (\n                prepend apiSchemas = [\"ShapingAPI\"]\n            )" : "") << "\n            {\n";
-        o << "                color3f inputs:color = " << vec(l.color) << "\n";
-        o << "                float inputs:intensity = " << num(l.intensity) << "\n";
-        o << "                float inputs:radius = " << num(l.radius) << "\n";
-        if (shaped) {
-          o << "                float inputs:shaping:cone:angle = " << num(l.coneAngle) << "\n";
-          o << "                float inputs:shaping:cone:softness = " << num(l.coneSoftness) << "\n";
-        }
-        o << "                float inputs:volumetric_radiance_scale = " << num(l.volumetric) << "\n";
-        if (l.animationMode != 0) {
-          o << "                int remix:animation:mode = " << l.animationMode << "\n";
-          o << "                float remix:animation:rate = " << num(l.animationRate) << "\n";
-          o << "                float remix:animation:duty = " << num(l.animationDuty) << "\n";
-          o << "                float remix:animation:phase = " << num(l.animationPhase) << "\n";
-          o << "                color3f remix:animation:colorB = " << vec(l.animationColorB) << "\n";
-        }
-        if (l.textureHash != 0) {
-          o << "                string remix:authoring:textureHash = \"" << hex16(l.textureHash) << "\"\n";
-        }
-        o << "                matrix4d xformOp:transform = " << lampMatrix(l) << "\n";
-        o << "                uniform token[] xformOpOrder = [\"xformOp:transform\"]\n";
-        o << "            }\n";
-      }
-      o << "        }\n";
+      o << "    }\n";
     }
-    o << "    }\n}\n";
-
+    o << "}\n";
+    const size_t primCount = keys[0].size() + keys[1].size();
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
     // Written to a temporary file and moved over the old one, so the file watcher never reads half a file.
@@ -324,7 +387,7 @@ namespace dxvk {
       Logger::err("[LightAuthoring] " + m_status);
       return false;
     }
-    m_status = str::format("Saved ", m_lamps.size(), " lamp(s) and ", m_meshMaterials.size(), " mesh material(s) on ", meshes.size(), " mesh(es) to ", path,
+    m_status = str::format("Saved ", m_lamps.size(), " lamp(s) and ", m_meshMaterials.size(), " mesh material(s) on ", primCount, " mesh(es) or texture(s) to ", path,
                            m_modFileExisted ? "" : ". The mod is new: its lights load at the next game start.");
     Logger::info("[LightAuthoring] " + m_status);
     return true;
