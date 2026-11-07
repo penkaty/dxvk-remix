@@ -196,6 +196,7 @@ namespace dxvk {
     uint32_t m_particleSystemCounter = 0;
 
     std::vector<SpawnContext> m_spawnContexts;
+    uint32_t m_spawnFrameId = 0;
     bool m_initialized = false;
 
     RTX_OPTION("rtx.particles", bool, enable, true, "Enables particle simulation and rendering.");
@@ -273,6 +274,7 @@ namespace dxvk {
     // Returns the spawn prev transform, collapsing it to currTransform on a motion discontinuity.
     Matrix4 resolveSpawnPrevTransform(const RtInstance& instance, const Matrix4& currTransform, const Matrix4& prevTransform, uint32_t currentFrameId);
 
+    void discardPendingSpawns();
     void prepareForNextFrame();
 
     bool fetchParticleSystem(DxvkContext* ctx, const DrawCallState& drawCallState, RtxParticleSystemDesc desc, const MaterialData& renderMaterialData, ParticleSystem** materialSystem);

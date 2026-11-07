@@ -610,6 +610,14 @@ namespace dxvk {
 
     m_initialized = true;
 
+    // Only a ray traced frame's simulate() consumes spawns. Frames without one (ray tracing off) leave them queued
+    // with instance indices that are stale by the next ray traced frame, so spawns older than a frame are dropped.
+    const uint32_t frameId = device()->getCurrentFrameId();
+    if (!m_spawnContexts.empty() && m_spawnFrameId + 1 < frameId) {
+      discardPendingSpawns();
+    }
+    m_spawnFrameId = frameId;
+
     ParticleSystem* particleSystem = nullptr;
     if (!fetchParticleSystem(ctx, drawCallState, desc, renderMaterialData, &particleSystem)) {
       return;
@@ -1271,6 +1279,16 @@ namespace dxvk {
       info.access = VK_ACCESS_TRANSFER_WRITE_BIT
         | VK_ACCESS_TRANSFER_READ_BIT;
       m_spawnContextsBuffer = device->createBuffer(info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, DxvkMemoryStats::Category::RTXBuffer, "RTX Particles - Spawn Context Buffer");
+    }
+  }
+
+  void RtxParticleSystemManager::discardPendingSpawns() {
+    m_spawnContexts.clear();
+    for (auto& entry : m_particleSystems) {
+      ParticleSystem& particleSystem = *entry.second.get();
+      particleSystem.context.particleHeadOffset = particleSystem.context.spawnParticleOffset;
+      particleSystem.context.spawnParticleCount = 0;
+      particleSystem.spawnContextParticleMap.clear();
     }
   }
 

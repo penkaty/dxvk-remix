@@ -32,6 +32,11 @@ Entry format:
 
 The New Vegas RTX runtime is Remix Plus with the additions below, which the Fallout: New Vegas integration uses. The dated entries after this section are the Remix Plus trunk's, and this runtime shares only part of that history. It does not have the trunk's frontend interface rework (interface steps I1 to I6f), the input checks at the scene interface, game lights, external frame export, neural uplift or the stress mode.
 
+### Particle spawns no longer pile up while ray tracing is off
+Spawns queued during frames without ray tracing carried stale instance indices into the next ray traced frame, which sent particles off to infinity and could hang the GPU. Spawns older than one frame are now dropped.
+- Options: none.
+- Commits: see the branch history of feat/20261106-mesh-materials.
+
 ### Host override layer for measurements
 `SetConfigVariable` values lost to `user.conf`, so a host's settings sweep silently measured the user's saved value for options such as the DLSS mode. The `override:` / `unoverride:` key prefixes now write a not-saved layer above `user.conf` and the quality preset.
 - Options: none. API: `override:<option>` and `unoverride:<option>` keys on `SetConfigVariable`.
