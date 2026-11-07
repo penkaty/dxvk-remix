@@ -3719,6 +3719,9 @@ namespace dxvk {
       void* libraryData = const_cast<std::vector<std::string>*>(&library);
       s_libraryChoice = std::clamp(s_libraryChoice, 0, static_cast<int>(library.size()) - 1);
       ImGui::Combo("Material", &s_libraryChoice, libraryName, libraryData, static_cast<int>(library.size()));
+      ImGui::RadioButton("Only the picked mesh", &s_anchor, 0);
+      ImGui::SameLine();
+      ImGui::RadioButton("Every mesh with the picked texture", &s_anchor, 1);
       if (!lamp_pick::g_armed && ImGui::Button("Pick a mesh for the material")) {
         lamp_pick::g_armed = true;
         lamp_pick::g_forMaterial = true;
