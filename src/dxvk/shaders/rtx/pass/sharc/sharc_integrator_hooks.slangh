@@ -169,16 +169,20 @@ void sharcDebugQuery(PathState pathState, bool selectedBounce, bool farEnough, b
 #endif
 
 // Called once per path, after the launch state is loaded and before the first segment is traced.
-// Seeds the path-summed roughness of the query's footprint gate with the primary's perceptual roughness,
-// or with 0 when the first lobe passed through a cutout, as upstream does.
-// sharcOnContinuationSampled adds to it for every later segment.
+// Seeds the path-summed roughness of the query's footprint gate the way sharcOnContinuationSampled adds a later
+// vertex (upstream 1ebdbf11e): 0 when the first lobe passed through a cutout, 1 for a diffuse lobe (as wide as lobes
+// get, whatever the surface's roughness), the primary's perceptual roughness for a specular lobe. Seeding a diffuse
+// ray with the roughness made a roughness gradient split paths between ending in the cache at the first hit and
+// tracing on.
 void sharcOnLaunch(inout PathState pathState, uvec2 pixel, float firstHitPerceptualRoughness)
 {
 #if ENABLE_SHARC && SHARC_QUERY
   IndirectSampleData indirectSampleData;
   indirectSampleData.load(u16vec2(pixel), FirstSampledLobeData);
   pathState.sharcLaunchPerceptualRoughness =
-    indirectSampleData.firstSampledLobeIsOpacityTransmission ? 0.0f : firstHitPerceptualRoughness;
+    indirectSampleData.firstSampledLobeIsOpacityTransmission ? 0.0f
+    : !indirectSampleData.firstSampledLobeIsSpecular ? surfaceMaterialInteractionSerializationDataFallbackPerceptualRoughness
+    : firstHitPerceptualRoughness;
 #endif
 }
 
