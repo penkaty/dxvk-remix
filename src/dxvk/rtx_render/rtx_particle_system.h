@@ -197,6 +197,7 @@ namespace dxvk {
 
     std::vector<SpawnContext> m_spawnContexts;
     uint32_t m_spawnFrameId = 0;
+    uint32_t m_simulateFrameId = 0; // frame of the last simulate(), the only consumer of spawns
     bool m_initialized = false;
 
     RTX_OPTION("rtx.particles", bool, enable, true, "Enables particle simulation and rendering.");

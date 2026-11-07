@@ -611,9 +611,12 @@ namespace dxvk {
     m_initialized = true;
 
     // Only a ray traced frame's simulate() consumes spawns. Frames without one (ray tracing off) leave them queued
-    // with instance indices that are stale by the next ray traced frame, so spawns older than a frame are dropped.
+    // with instance indices that are stale by the next ray traced frame. The game keeps spawning in those frames, so
+    // the test is the last simulate(), not the last spawn: once a frame has passed without one, the queue is dropped
+    // (at most one frame's spawns are ever pending; before, a raster period's spawns all landed on the first ray
+    // traced frame: a burst of particles, then a device loss on the next toggle, run 20261107-051117).
     const uint32_t frameId = device()->getCurrentFrameId();
-    if (!m_spawnContexts.empty() && m_spawnFrameId + 1 < frameId) {
+    if (!m_spawnContexts.empty() && m_spawnFrameId != frameId && m_simulateFrameId + 1 < frameId) {
       discardPendingSpawns();
     }
     m_spawnFrameId = frameId;
@@ -669,6 +672,7 @@ namespace dxvk {
       fork_game_state::GameStateStore::get().set("__rbrrtx.killbox.v", "1");
       s_announcedCarBox = true;
     }
+    m_simulateFrameId = device()->getCurrentFrameId();
 
     if (!enable() || !m_initialized) {
       m_spawnContexts.clear();
