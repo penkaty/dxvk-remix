@@ -2025,9 +2025,37 @@ namespace {
 
     std::string strKey = std::string{ key };
 
+    // "override:<option>" writes the host overrides layer, which wins over user.conf.
+    // "unoverride:<option>" removes that option's override again.
+    constexpr std::string_view kOverridePrefix = "override:";
+    constexpr std::string_view kUnoverridePrefix = "unoverride:";
+    const bool isOverride = strKey.rfind(kOverridePrefix, 0) == 0;
+    const bool isUnoverride = strKey.rfind(kUnoverridePrefix, 0) == 0;
+    if (isOverride) {
+      strKey.erase(0, kOverridePrefix.size());
+    } else if (isUnoverride) {
+      strKey.erase(0, kUnoverridePrefix.size());
+    }
+
     dxvk::RtxOptionImpl* option = dxvk::RtxOptionImpl::getOptionByFullName(strKey);
     if (!option) {
       return REMIXAPI_ERROR_CODE_GENERAL_FAILURE;
+    }
+
+    if (isOverride || isUnoverride) {
+      const dxvk::RtxOptionLayer* overrides = dxvk::RtxOptionLayer::getHostOverridesLayer();
+      if (!overrides) {
+        return REMIXAPI_ERROR_CODE_GENERAL_FAILURE;
+      }
+      std::lock_guard optionLock { dxvk::RtxOptionImpl::getUpdateMutex() };
+      if (isUnoverride) {
+        option->disableLayerValue(overrides);
+      } else {
+        dxvk::Config overrideSetting;
+        overrideSetting.setOptionMove(std::move(strKey), std::string{ value });
+        option->readOption(overrideSetting, overrides);
+      }
+      return REMIXAPI_ERROR_CODE_SUCCESS;
     }
 
     dxvk::Config newSetting;

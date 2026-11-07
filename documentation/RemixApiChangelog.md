@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `requestHostRelease` is set from level 2 (High) by default.
 
 ### Added
+- 2026-11-07: `SetConfigVariable` key prefixes `override:<option>` and
+  `unoverride:<option>` set and remove a value in the new "Host Overrides (not
+  saved)" option layer, which wins over `user.conf` and the quality preset.
 - 2026-10-27: the bridge forwards `remixapi_InstanceInfoGpuInstancingEXT` on
   `DrawInstance` and the retained-instance calls (the client logs "Forwarding
   InstanceInfoGpuInstancingEXT"), so 32-bit hosts can GPU-instance a mesh.

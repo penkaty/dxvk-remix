@@ -438,6 +438,21 @@ iface.SetConfigVariable("rtx.bloom.luminanceThreshold", "0.4");
 iface.SetConfigVariable("rtx.fogColorScale",            "0.25");
 ```
 
+Values set this way go into the "Host Drivers (not saved)" layer, which a
+value saved in `user.conf` still beats. Two key prefixes reach a layer above
+`user.conf` and the quality preset, for measurements that must take effect
+whatever the user saved:
+
+- `override:<option>` sets the option in the "Host Overrides (not saved)" layer.
+- `unoverride:<option>` removes that option's override again (the value is ignored).
+
+```c
+iface.SetConfigVariable("override:rtx.qualityDLSS", "0");
+iface.SetConfigVariable("unoverride:rtx.qualityDLSS", "");
+```
+
+Overrides are never saved. A host that sets them removes them when it is done.
+
 For the full list of available keys, see [`RtxOptions.md`](../RtxOptions.md).
 For the architecture (config layers, priority, persistence), see
 [`RemixConfig.md`](RemixConfig.md). For fork-side `rtx.*` namespaces

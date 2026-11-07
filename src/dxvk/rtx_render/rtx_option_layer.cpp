@@ -688,6 +688,7 @@ namespace dxvk {
     s_qualityLayer = RtxOptionManager::acquireLayer("", kRtxOptionLayerQualityKey, 1.0f, 0.1f, true, nullptr);
     s_hostListsLayer = RtxOptionManager::acquireLayer("", kRtxOptionLayerHostListsKey, 1.0f, 0.1f, true, nullptr);
     s_hostDriversLayer = RtxOptionManager::acquireLayer("", kRtxOptionLayerHostDriversKey, 1.0f, 0.1f, true, nullptr);
+    s_hostOverridesLayer = RtxOptionManager::acquireLayer("", kRtxOptionLayerHostOverridesKey, 1.0f, 0.1f, true, nullptr);
 
     // 6. user.conf (user settings layer) - highest priority for end-user changes (not included in merged config)
     // User layer is designated for UserSetting options only; other options are miscategorized here.

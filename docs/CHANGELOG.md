@@ -32,6 +32,11 @@ Entry format:
 
 The New Vegas RTX runtime is Remix Plus with the additions below, which the Fallout: New Vegas integration uses. The dated entries after this section are the Remix Plus trunk's, and this runtime shares only part of that history. It does not have the trunk's frontend interface rework (interface steps I1 to I6f), the input checks at the scene interface, game lights, external frame export, neural uplift or the stress mode.
 
+### Host override layer for measurements
+`SetConfigVariable` values lost to `user.conf`, so a host's settings sweep silently measured the user's saved value for options such as the DLSS mode. The `override:` / `unoverride:` key prefixes now write a not-saved layer above `user.conf` and the quality preset.
+- Options: none. API: `override:<option>` and `unoverride:<option>` keys on `SetConfigVariable`.
+- Commits: see the branch history of feat/20261106-mesh-materials.
+
 ### Materials bound to a mesh replace the original draw's material
 A game texture is often shared by very different meshes, so a texture-hash material cannot fit all of them. A `material:binding` on a mesh replacement that keeps the original draw now replaces that draw's material, with the game's colour texture merged in. The Lamps tab picks a mesh (the object under the mouse is highlighted while picking) and binds a material from `library.usda` in the lamp mod's folder.
 - Options: none.

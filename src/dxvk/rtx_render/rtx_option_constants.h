@@ -197,6 +197,9 @@ namespace dxvk {
   static constexpr RtxOptionLayerKey kRtxOptionLayerDerivedKey     = { 6,          "Derived Settings" };  // OnChange callbacks when no menu is open
   static constexpr RtxOptionLayerKey kRtxOptionLayerUserKey        = { 0xFFFFFFFE, "User Settings" };
   static constexpr RtxOptionLayerKey kRtxOptionLayerQualityKey     = { 0xFFFFFFFF, "Quality Presets" };  // Highest priority when preset is not Custom
+  // Values a host sets with the "override:" key prefix of remixapi_SetConfigVariable, for measurements that must win
+  // over user.conf. Layers of equal priority are ordered by name, so this one beats the quality and user layers.
+  static constexpr RtxOptionLayerKey kRtxOptionLayerHostOverridesKey = { 0xFFFFFFFF, "Host Overrides (not saved)" };
 
 }  // namespace dxvk
 
