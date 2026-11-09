@@ -790,6 +790,28 @@ namespace dxvk
     m_matCache[MatrixType::FreeCamWorldToView] = inverse(freeCamViewToWorld);
     m_matCache[MatrixType::FreeCamViewToWorld] = freeCamViewToWorld;
 
+    // RBR-RTX: the host aims its in-game picker along the free camera (named section, read by the x86 proxy).
+    if (m_type == CameraType::Main) {
+      struct HostFreeCamera { volatile LONG seq; int enabled; float pos[3], right[3], up[3], forward[3]; };
+      static HostFreeCamera* s_hostFreeCam = []() -> HostFreeCamera* {
+        HANDLE map = CreateFileMappingA(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(HostFreeCamera), "RBRRTX_RemixFreeCamera");
+        return map ? static_cast<HostFreeCamera*>(MapViewOfFile(map, FILE_MAP_WRITE, 0, 0, sizeof(HostFreeCamera))) : nullptr;
+      }();
+      if (s_hostFreeCam) {
+        const Vector3d r = freeCamViewToWorld[0].xyz(), u = freeCamViewToWorld[1].xyz(), z = freeCamViewToWorld[2].xyz(), p = freeCamViewToWorld[3].xyz();
+        const double forwardSign = m_context.isLHS ? 1.0 : -1.0;       // view z points away from the view in a right-handed frame
+        InterlockedIncrement(&s_hostFreeCam->seq);
+        s_hostFreeCam->enabled = isFreeCameraEnabled() ? 1 : 0;
+        for (int k = 0; k < 3; ++k) {
+          s_hostFreeCam->pos[k] = float(p[k]);
+          s_hostFreeCam->right[k] = float(r[k]);
+          s_hostFreeCam->up[k] = float(u[k]);
+          s_hostFreeCam->forward[k] = float(z[k] * forwardSign);
+        }
+        InterlockedIncrement(&s_hostFreeCam->seq);
+      }
+    }
+
     m_matCache[MatrixType::FreeCamPreviousTranslatedWorldToView] = m_matCache[MatrixType::FreeCamTranslatedWorldToView];
     m_matCache[MatrixType::FreeCamPreviousViewToTranslatedWorld] = m_matCache[MatrixType::FreeCamViewToTranslatedWorld];
     m_matCache[MatrixType::FreeCamTranslatedWorldToView] = inverse(freeCamViewToTranslatedWorld);

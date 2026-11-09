@@ -2805,9 +2805,10 @@ namespace dxvk {
 
       // Calculate thumbnail extent with respect to image aspect
       const float aspect = static_cast<float>(imageInfo.extent.width) / imageInfo.extent.height;
+      // RBR-RTX: at least 16 px each way: a 2048x4 strip was a button under a pixel tall that no click could reach.
       const ImVec2 extent {
-        aspect >= 1.f ? thumbnailSize : thumbnailSize * aspect,
-        aspect <= 1.f ? thumbnailSize : thumbnailSize / aspect
+        std::max(aspect >= 1.f ? thumbnailSize : thumbnailSize * aspect, 16.f),
+        std::max(aspect <= 1.f ? thumbnailSize : thumbnailSize / aspect, 16.f)
       };
 
       // Align thumbnail image button
