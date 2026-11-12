@@ -112,6 +112,10 @@ struct GpuParticleSystemDesc {
   // RBR-RTX: particles that enter ParticleSystemConstants::killBox* (a host-supplied oriented box, normally the player's car)
   // are killed, at spawn and every simulation step. Not part of the API struct: bit 0x40 of collisionMode.
   uint8_t killInCarBox : 1;
+  // RBR-RTX: motion trails (and align to velocity) use the particle's velocity relative to the camera
+  // (ParticleSystemConstants::cameraVelocity): rain streaks slant towards a moving camera, as seen from a moving car.
+  // The particles themselves stay in world space. Not part of the API struct: bit 0x20 of collisionMode.
+  uint8_t relativeTrail : 1;
 
 // Note: Spatial fields (collisionThickness, attractorRadius, gravityForce,
   // initialVelocityFromNormal, attractorForce, turbulenceForce, turbulenceFrequency)
@@ -173,6 +177,7 @@ struct RtxParticleSystemDesc : GpuParticleSystemDesc {
     restrictVelocityZ = 0;
     traceSpawnOcclusion = 0;
     killInCarBox = 0;
+    relativeTrail = 0;
   }
 
   XXH64_hash_t calcHash() const {
@@ -266,6 +271,10 @@ struct ParticleSystemConstants {
   float maxScreenCoverage;
   uint killBoxPad1;
   uint killBoxPad2;
+
+  // RBR-RTX: the camera's world velocity (m/s), smoothed over ~50 ms, zero on camera cuts. Read by relativeTrail systems.
+  vec3 cameraVelocity;
+  uint cameraVelocityPad;
 };
 
 #ifndef __cplusplus

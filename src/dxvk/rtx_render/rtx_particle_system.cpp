@@ -408,6 +408,31 @@ namespace dxvk {
     constants.killBoxHalfLength = constants.killBoxHalfWidth = constants.killBoxHalfHeight = 0.f;
     constants.maxScreenCoverage = maxScreenCoverage();
     constants.killBoxPad1 = constants.killBoxPad2 = 0;
+
+    // RBR-RTX: camera velocity for relativeTrail. From consecutive frames only (a gap or a camera cut starts again at
+    // zero), clamped (a teleport the cut flag missed), smoothed over ~50 ms so the cockpit camera's shake does not
+    // make every streak flicker.
+    {
+      const Vector3 pos = camera.getPosition();
+      const uint32_t frame = device()->getCurrentFrameId();
+      const float realDt = GlobalTime::get().deltaTime();
+      Vector3 raw(0.f);
+      bool valid = m_cameraVelocityFrame != ~0u && frame == m_cameraVelocityFrame + 1 && !camera.isCameraCut() && realDt > 1e-4f;
+      if (valid) {
+        raw = (pos - m_prevCameraPos) * (1.f / realDt);
+        if (dot(raw, raw) > 150.f * 150.f) valid = false;
+      }
+      if (valid) {
+        const float k = 1.f - std::exp(-realDt / 0.05f);
+        m_cameraVelocity = m_cameraVelocity + (raw - m_cameraVelocity) * k;
+      } else {
+        m_cameraVelocity = Vector3(0.f);
+      }
+      m_prevCameraPos = pos;
+      m_cameraVelocityFrame = frame;
+      constants.cameraVelocity = vec3(m_cameraVelocity.x, m_cameraVelocity.y, m_cameraVelocity.z);
+      constants.cameraVelocityPad = 0;
+    }
     std::string carBox;
     if (fork_game_state::GameStateStore::get().tryGet("__rbrrtx.carbox", carBox)) {
       int on = 0;
@@ -670,7 +695,8 @@ namespace dxvk {
     // "__rbrrtx.carbox"). Set on the first frame, before any early out: a host reads it back before it creates its systems.
     static bool s_announcedCarBox = false;
     if (!s_announcedCarBox) {
-      fork_game_state::GameStateStore::get().set("__rbrrtx.killbox.v", "1");
+      // "2": also bit 0x20, trails relative to the camera (GpuParticleSystemDesc::relativeTrail).
+      fork_game_state::GameStateStore::get().set("__rbrrtx.killbox.v", "2");
       s_announcedCarBox = true;
     }
     m_simulateFrameId = device()->getCurrentFrameId();

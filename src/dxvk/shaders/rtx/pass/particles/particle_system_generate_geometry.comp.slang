@@ -231,10 +231,14 @@ void main(uint2 threadIdx : SV_DispatchThreadID)
     }
   }
   
+  // RBR-RTX relativeTrail: streaks and alignment follow the motion seen from the moving camera (rain from a car).
+  const float3 shownVelocity = particleSystem.desc.relativeTrail ? float3(particle.velocity) - particleCb.cameraVelocity
+                                                                 : float3(particle.velocity);
+
   float2x2 rot2D = float2x2(1.f, 0.f, 0.f, 1.f);
   if (particleSystem.desc.alignParticlesToVelocity)
   {
-    float2 sc = calcBillboardSinCos(particle.velocity, basisRight, basisUp);
+    float2 sc = calcBillboardSinCos(shownVelocity, basisRight, basisUp);
     rot2D = float2x2(sc.y, -sc.x, sc.x, sc.y);
   }
   else
@@ -301,7 +305,7 @@ void main(uint2 threadIdx : SV_DispatchThreadID)
     if (particleSystem.desc.enableMotionTrail) 
     {
       // project velocity into billboard plane
-      float2 motionPlane = -float2(dot(particle.velocity, basisRight), dot(particle.velocity, basisUp));
+      float2 motionPlane = -float2(dot(shownVelocity, basisRight), dot(shownVelocity, basisUp));
       float speed = length(motionPlane);
 
       // forward axis & width axis

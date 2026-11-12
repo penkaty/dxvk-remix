@@ -1056,7 +1056,9 @@ namespace {
       // Bit 0x40: kill inside the host's car box (ParticleSystemConstants::killBox*, game value "__rbrrtx.carbox"). Hosts must
       // not set it before reading "__rbrrtx.killbox.v" back: a runtime without this bit would read 0x42 as no collision mode.
       desc.killInCarBox = (info.collisionMode & 0x40) ? 1 : 0;
-      desc.collisionMode = static_cast<ParticleCollisionMode>(info.collisionMode & 0x3F);
+      // Bit 0x20: trails relative to the camera (GpuParticleSystemDesc::relativeTrail). "__rbrrtx.killbox.v" >= 2 announces it.
+      desc.relativeTrail = (info.collisionMode & 0x20) ? 1 : 0;
+      desc.collisionMode = static_cast<ParticleCollisionMode>(info.collisionMode & 0x1F);
       desc.randomFlipAxis = static_cast<ParticleRandomFlipAxis>(info.randomFlipAxis);
       desc.restrictVelocityX = static_cast<uint8_t>(info.restrictVelocityX);
       desc.restrictVelocityY = static_cast<uint8_t>(info.restrictVelocityY);

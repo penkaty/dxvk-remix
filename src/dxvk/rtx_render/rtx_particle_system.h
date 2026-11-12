@@ -198,6 +198,10 @@ namespace dxvk {
     std::vector<SpawnContext> m_spawnContexts;
     uint32_t m_spawnFrameId = 0;
     uint32_t m_simulateFrameId = 0; // frame of the last simulate(), the only consumer of spawns
+    // RBR-RTX: camera velocity for relativeTrail systems (setupConstants).
+    Vector3 m_prevCameraPos = Vector3(0.f);
+    Vector3 m_cameraVelocity = Vector3(0.f);
+    uint32_t m_cameraVelocityFrame = ~0u;
     bool m_initialized = false;
 
     RTX_OPTION("rtx.particles", bool, enable, true, "Enables particle simulation and rendering.");
