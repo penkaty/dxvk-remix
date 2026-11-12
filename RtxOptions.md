@@ -1042,6 +1042,7 @@ This file is generated from the source by `scripts/gen_rtx_options_md.py`. Run `
 |rtx.particles.globalPreset.turbulenceFrequency|float|0.05|||Frequency \(rate of change\) of the turbulence forces\. Lower values change slowly; higher values change rapidly\.  This is specified in centimeters\.|
 |rtx.particles.globalPreset.useSpawnTexcoords|bool|False|||Use the texture coordinates of the emitter mesh when spawning particles\.|
 |rtx.particles.globalPreset.useTurbulence|bool|False|||Enable turbulence simulation\.|
+|rtx.particles.localLightFalloffStartMeters|float|0|||Beyond this distance from a sphere light, rtx\.particles\.localLightGain fades with the distance instead of its square, so headlights show rain and snow farther ahead without brightening the particles near the lamp\. In meters, 0 keeps the physical falloff everywhere\.|
 |rtx.particles.localLightGain|float|0|||Lights particles of API materials \(rain, snow, dust\) directly with the sphere lights near them, such as headlights and lamps, without shadows\. The froxel cache that lights particles otherwise is too coarse to show a narrow beam in rain\. 1 is physical, 0 turns it off\.|
 |rtx.particles.localLightMaxCount|int|64|||The most sphere lights rtx\.particles\.localLightGain looks at for each particle hit, 1 to 256\. Lights past this count in the light list are ignored, so raise it in scenes with many lamps\.|
 |rtx.particles.localLightRangeMeters|float|40|||Sphere lights farther than this from a particle are skipped by rtx\.particles\.localLightGain, in meters\.|

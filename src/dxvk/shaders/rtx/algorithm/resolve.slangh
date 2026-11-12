@@ -159,7 +159,11 @@ vec3 evalParticleLocalLights(vec3 position)
     // The sphere is treated as a point seen from outside, clamped at its surface.
     const float radiusSquared = square(float(sphereLight.radius));
     const float shaping = sphereLightCalcShaping(sphereLight, -lightVector * rsqrt(max(distanceSquared, 1e-8f)));
-    irradiance += sphereLight.radiance * (pi * radiusSquared / max(distanceSquared, radiusSquared)) * shaping;
+    // Past the falloff start the light fades with the distance instead of its square.
+    const float reach = cb.particleLocalLightFalloffStart > 0.0f
+      ? max(1.0f, sqrt(distanceSquared) / cb.particleLocalLightFalloffStart)
+      : 1.0f;
+    irradiance += sphereLight.radiance * (pi * radiusSquared / max(distanceSquared, radiusSquared)) * shaping * reach;
   }
 
   return irradiance * (cb.particleLocalLightGain / pi);

@@ -32,6 +32,16 @@ Entry format:
 
 The New Vegas RTX runtime is Remix Plus with the additions below, which the Fallout: New Vegas integration uses. The dated entries after this section are the Remix Plus trunk's, and this runtime shares only part of that history. It does not have the trunk's frontend interface rework (interface steps I1 to I6f), the input checks at the scene interface, game lights, external frame export, neural uplift or the stress mode.
 
+### World no longer vanishes while the game window is inactive
+With the window inactive, a frame with more scenes than the last presented one was ended early without injection, so a game that keeps presenting with a varying scene count per frame lost its ray traced world and showed only what came after the split. An inactive window now counts as drawing without presenting only after far more scenes than a presented frame has, and any present ends that state.
+- Options: none.
+- Commits: see the branch history of feat/20261106-mesh-materials.
+
+### Particle local lights reach farther
+`rtx.particles.localLightGain` can fade with the distance instead of its square beyond a set distance, so headlights show rain and snow farther ahead without brightening the particles near the lamp.
+- Options: added `rtx.particles.localLightFalloffStartMeters` (default 0, the physical falloff everywhere). Preset-independent: it changes a term's shape, not its cost.
+- Commits: see the branch history of feat/20261106-mesh-materials.
+
 ### GPU device loss when a BLAS drops an opacity micromap in flight (upstream d6d005566)
 Rebuilding or releasing a BLAS let go of the micromaps it held while an earlier frame's TLAS could still be traced through them (page fault, device loss). Those micromaps now stay alive until the current command list completes.
 - Options: none.

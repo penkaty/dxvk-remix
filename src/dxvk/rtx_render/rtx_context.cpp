@@ -2252,6 +2252,7 @@ namespace dxvk {
     constants.particleSkyAmbientScale = RtxOptions::particleSkyAmbientScale();
     constants.particleLocalLightGain = RtxParticleSystemManager::localLightGain();
     constants.particleLocalLightRange = RtxParticleSystemManager::localLightRangeMeters() * RtxOptions::getMeterToWorldUnitScale();
+    constants.particleLocalLightFalloffStart = RtxParticleSystemManager::localLightFalloffStartMeters() * RtxOptions::getMeterToWorldUnitScale();
     constants.particleLocalLightMaxCount = RtxParticleSystemManager::localLightGain() > 0.0f
       ? static_cast<uint32_t>(std::clamp(RtxParticleSystemManager::localLightMaxCount(), 1, 256))
       : 0u;

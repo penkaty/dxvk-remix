@@ -627,7 +627,8 @@ struct RaytraceArgs {
   uint particleLocalLightMaxCount;
   float particleLocalLightGain;
   float particleLocalLightRange;
-  float particleLocalLightPad0;
+  // World units, 0 keeps the inverse-square falloff at every distance.
+  float particleLocalLightFalloffStart;
 
   // rtx.cardNormals.dome and rtx.cardNormals.domeSpread, see calcCardNormal in surface_interaction.slangh.
   uint cardNormalsDome;
