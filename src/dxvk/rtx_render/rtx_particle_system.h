@@ -212,6 +212,10 @@ namespace dxvk {
     RTX_OPTION("rtx.particles", float, localLightRangeMeters, 40.f, "Sphere lights farther than this from a particle are skipped by rtx.particles.localLightGain, in meters.");
     RTX_OPTION("rtx.particles", float, localLightFalloffStartMeters, 0.f, "Beyond this distance from a sphere light, rtx.particles.localLightGain fades with the distance instead of its square, so headlights show rain and snow farther ahead without brightening the particles near the lamp. In meters, 0 keeps the physical falloff everywhere.");
     RTX_OPTION("rtx.particles", int, localLightMaxCount, 64, "The most sphere lights rtx.particles.localLightGain looks at for each particle hit, 1 to 256. Lights past this count in the light list are ignored, so raise it in scenes with many lamps.");
+    // RBR-RTX: falling snow and rain left trails of copies under Ray Reconstruction. The bias-current-colour (anti-ghost)
+    // mask was set only where particles emit, so RR kept history of each non-emissive flake (whose own motion vectors it never
+    // gets) and showed it again a frame's fall apart.
+    RTX_OPTION("rtx.particles", float, antiGhostCoverage, 0.f, "Non-emissive particles covering at least this much of a pixel (0-1) also get Ray Reconstruction's anti-ghost mask (falling snow and rain otherwise leave a trail of copies). 0 = only emissive ones, as upstream.");
     RTX_OPTION("rtx.particles", float, maxScreenCoverage, 0.f, "Fades billboards that near the camera, starting at this size in screen heights and gone at twice that. Cuts the cost of a camera inside a cloud of large particles, where each pixel otherwise passes through many of them. 0 turns it off.");
 
     RTX_OPTION("rtx.particles", bool, enableDiscontinuityGuard, false, "ON: when an emitter's one-frame motion deviates from a moving average of its recent velocity (swap / teleport / loop restart), collapse the spawn prev transform to the current one to kill the spawn ghost trail. This may fix bugs where particles seems to blur across large distances for one frame. Option may be removed when instance tracking becomes more reliable.");

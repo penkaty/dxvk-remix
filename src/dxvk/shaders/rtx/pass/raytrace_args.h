@@ -634,7 +634,9 @@ struct RaytraceArgs {
   uint cardNormalsDome;
   float cardNormalsDomeSpread;
   float cardNormalsPad0;
-  float cardNormalsPad1;
+  // RBR-RTX: rtx.particles.antiGhostCoverage. Pixels whose unordered particles cover at least this much (1 - their
+  // attenuation) also go into Ray Reconstruction's bias-current-colour mask, not only emissive ones. 0 = off.
+  float particleAntiGhostCoverage;
 
   // NOTE: Add structs to the top section of RaytraceArgs, not the bottom.
   // NOTE: bool does not work in debug builds, use uint instead.

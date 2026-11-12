@@ -2039,6 +2039,9 @@ void geometryResolverVertex(
   }
   // resolveVertex adds the hit's own emission to emissiveRadiance, after the unordered particles' emission.
   const vec3 unorderedEmissiveRadiance = emissiveRadiance;
+  // The particles' own attenuation (resolveVertex may add a translucent hit's): RBR-RTX anti-ghost coverage below.
+  const bool unorderedCovers = numUnorderedInteractions != 0 && cb.particleAntiGhostCoverage > 0.0f &&
+    1.0f - min(radianceAttenuation.r, min(radianceAttenuation.g, radianceAttenuation.b)) >= cb.particleAntiGhostCoverage;
 
   if (GBUFFER_FEATURE_DEBUG_VIEW && cb.debugView == DEBUG_VIEW_PRIMARY_DECAL_ALBEDO)
   {
@@ -2610,7 +2613,7 @@ void geometryResolverVertex(
   SharedRadianceB[geometryResolverState.pixelCoordinate] = geometryResolverState.radiance.b;
 
   // The particles (shared bias mask) are using opaque approximations, which only result in monochromatic attenuation, so we just need to output single channel here
-  SharedBiasCurrentColorMask[geometryResolverState.pixelCoordinate] = isUnorderedEmissive ? 1.0f : 0.0f;
+  SharedBiasCurrentColorMask[geometryResolverState.pixelCoordinate] = isUnorderedEmissive || unorderedCovers ? 1.0f : 0.0f;
 
   // Output the Integration Surface PDF
   // Note: This is written out so the integrator can use this as a starting point due to basing itself off this stochastic choice
@@ -3546,7 +3549,9 @@ void geometryResolverDeferredUnorderedParticles(ivec2 pixelCoordinate, bool isMi
   SharedRadianceB[pixelCoordinate] = patchedRadiance.b;
   PrimaryAttenuation[pixelCoordinate] =
     colorToR11G11B10(radianceAttenuation * r11g11b10ToColor(PrimaryAttenuation[pixelCoordinate]));
-  if (emits)
+  const bool covers = cb.particleAntiGhostCoverage > 0.0f &&
+    1.0f - min(radianceAttenuation.r, min(radianceAttenuation.g, radianceAttenuation.b)) >= cb.particleAntiGhostCoverage;
+  if (emits || covers)
   {
     SharedBiasCurrentColorMask[pixelCoordinate] = 1.0f;
   }
