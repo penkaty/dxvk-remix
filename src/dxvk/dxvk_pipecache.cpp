@@ -68,7 +68,7 @@ namespace dxvk {
   DxvkPipelineCache::~DxvkPipelineCache() {
     if (m_saveThread.joinable())
       m_saveThread.join();
-    if (!m_path.empty() && m_created.load() != m_createdAtLastSave)
+    if (!m_path.empty() && m_misses.load() + m_unknown.load() != m_freshAtLastSave)
       save();
     logSummary();
     m_vkd->vkDestroyPipelineCache(
@@ -272,6 +272,12 @@ namespace dxvk {
     logSummary();
     if (m_path.empty())
       return;
+    // Nothing compiled since the last save: every new pipeline came from the cache, so the file would not change.
+    const uint32_t misses = m_misses.load();
+    if (misses == m_missesAtLastSave) {
+      m_createdAtLastSave = created;
+      return;
+    }
     // At most one background save every 30 s; the first burst (the startup prewarm) saves at once.
     const auto now = dxvk::high_resolution_clock::now();
     if (m_createdAtLastSave != 0 && std::chrono::duration<double>(now - m_lastSave).count() < 30.0)
@@ -279,6 +285,8 @@ namespace dxvk {
     if (m_saveThread.joinable())
       m_saveThread.join();
     m_createdAtLastSave = created;
+    m_missesAtLastSave = misses;
+    m_freshAtLastSave = misses + m_unknown.load();
     m_lastSave = now;
     m_saving.store(true);
     m_saveThread = dxvk::thread([this] () {

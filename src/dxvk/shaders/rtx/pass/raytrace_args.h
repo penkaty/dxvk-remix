@@ -618,9 +618,11 @@ struct RaytraceArgs {
   float wetMapTraceTop;
   float wetMapTraceBottom;
   float wetRaindropDensity;
-  float wetPad0;
-  float wetPad1;
-  float wetPad2;
+  // RBR-RTX: the world displacement over the last frame of the falling particles (rtx.particles.motionVectorVelocity x frame
+  // time), for their motion vectors below. (Were wetPad0-2.)
+  float particleMotionX;
+  float particleMotionY;
+  float particleMotionZ;
 
   // Direct light of nearby sphere lights on sky-lit particles, see evalParticleLocalLights in resolve.slangh.
   // particleLocalLightMaxCount is 0 when the term is off.
@@ -633,7 +635,8 @@ struct RaytraceArgs {
   // rtx.cardNormals.dome and rtx.cardNormals.domeSpread, see calcCardNormal in surface_interaction.slangh.
   uint cardNormalsDome;
   float cardNormalsDomeSpread;
-  float cardNormalsPad0;
+  // RBR-RTX: rtx.particles.motionVectorCoverage; 0 = off (was cardNormalsPad0).
+  float particleMotionCoverage;
   // RBR-RTX: rtx.particles.antiGhostCoverage. Pixels whose unordered particles cover at least this much (1 - their
   // attenuation) also go into Ray Reconstruction's bias-current-colour mask, not only emissive ones. 0 = off.
   float particleAntiGhostCoverage;

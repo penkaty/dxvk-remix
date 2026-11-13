@@ -2254,6 +2254,14 @@ namespace dxvk {
     constants.particleLocalLightRange = RtxParticleSystemManager::localLightRangeMeters() * RtxOptions::getMeterToWorldUnitScale();
     constants.particleLocalLightFalloffStart = RtxParticleSystemManager::localLightFalloffStartMeters() * RtxOptions::getMeterToWorldUnitScale();
     constants.particleAntiGhostCoverage = std::clamp(RtxParticleSystemManager::antiGhostCoverage(), 0.0f, 1.0f);
+    {
+      constants.particleMotionCoverage = std::clamp(RtxParticleSystemManager::motionVectorCoverage(), 0.0f, 1.0f);
+      const float k = GlobalTime::get().deltaTime() * RtxOptions::getMeterToWorldUnitScale();
+      const Vector3 v = RtxParticleSystemManager::motionVectorVelocity();
+      constants.particleMotionX = v.x * k;
+      constants.particleMotionY = v.y * k;
+      constants.particleMotionZ = v.z * k;
+    }
     constants.particleLocalLightMaxCount = RtxParticleSystemManager::localLightGain() > 0.0f
       ? static_cast<uint32_t>(std::clamp(RtxParticleSystemManager::localLightMaxCount(), 1, 256))
       : 0u;

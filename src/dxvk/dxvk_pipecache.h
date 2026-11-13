@@ -128,6 +128,11 @@ namespace dxvk {
     std::atomic<uint32_t>   m_unknown { 0 };
     std::atomic<uint64_t>   m_missMicroseconds { 0 };
     uint32_t                m_createdAtLastSave = 0;
+    // RBR-RTX: compiled (missed) pipelines at the last save. A pipeline found in the cache adds nothing to the file, but
+    // m_created counts it: the menu's few cached creations made a full 540 MB save every 30 s (user 2026-11-13: periodic
+    // stutter in the main menu). Saves now follow new compiles only; the exit save also covers unknown ones.
+    uint32_t                m_missesAtLastSave = 0;
+    uint32_t                m_freshAtLastSave = 0;
     uint32_t                m_createdAtLastSummary = 0;
     dxvk::high_resolution_clock::time_point m_lastSave;
     dxvk::thread            m_saveThread;

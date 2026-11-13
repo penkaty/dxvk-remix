@@ -216,6 +216,10 @@ namespace dxvk {
     // mask was set only where particles emit, so RR kept history of each non-emissive flake (whose own motion vectors it never
     // gets) and showed it again a frame's fall apart.
     RTX_OPTION("rtx.particles", float, antiGhostCoverage, 0.f, "Non-emissive particles covering at least this much of a pixel (0-1) also get Ray Reconstruction's anti-ghost mask (falling snow and rain otherwise leave a trail of copies). 0 = only emissive ones, as upstream.");
+    // RBR-RTX: the anti-ghost mask did not stop it (user 2026-11-13, with RR and with DLSS): a flake's pixels took the motion
+    // vector of the surface behind it, so the upscaler's history put the flake back where it had been, a trail of copies.
+    RTX_OPTION("rtx.particles", float, motionVectorCoverage, 0.f, "Pixels where unordered particles cover at least this much (0-1) take the particles' motion vector: their own depth and rtx.particles.motionVectorVelocity, blended by coverage (depth too where they dominate). Stops falling snow and rain leaving a trail of copies in DLSS / Ray Reconstruction. 0 = off, as upstream.");
+    RTX_OPTION("rtx.particles", Vector3, motionVectorVelocity, Vector3(0.f, 0.f, 0.f), "World velocity (metres per second) assumed for particles in their motion vectors, e.g. the fall speed of the rain or snow (rtx.particles.motionVectorCoverage).");
     RTX_OPTION("rtx.particles", float, maxScreenCoverage, 0.f, "Fades billboards that near the camera, starting at this size in screen heights and gone at twice that. Cuts the cost of a camera inside a cloud of large particles, where each pixel otherwise passes through many of them. 0 turns it off.");
 
     RTX_OPTION("rtx.particles", bool, enableDiscontinuityGuard, false, "ON: when an emitter's one-frame motion deviates from a moving average of its recent velocity (swap / teleport / loop restart), collapse the spawn prev transform to the current one to kill the spawn ghost trail. This may fix bugs where particles seems to blur across large distances for one frame. Option may be removed when instance tracking becomes more reliable.");

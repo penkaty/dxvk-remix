@@ -1966,6 +1966,44 @@ void geometryResolverAccumulateForegroundEmissionDepth(
   AtmosphereForegroundEmissionDepth[pixelCoordinate] = meanDepthKm;
 }
 
+// RBR-RTX: particles' motion vector. Where the unordered particles in front of the hit cover at least
+// cb.particleMotionCoverage of the pixel, its motion vector comes from the nearest particle's own position, moved by the
+// configured fall over the last frame, instead of the surface behind it (blended by coverage, the depth too where they
+// dominate), as the composite pass does for NUMOS clouds. Without it DLSS / RR reprojected falling flakes with the
+// background's motion and kept each one where it had been: a trail of copies (user 2026-11-13).
+void rbrParticleMotionVector(uvec2 pixelCoordinate, vec3 origin, vec3 direction, vec3 particleAttenuation, float particleDistance)
+{
+  if (cb.particleMotionCoverage <= 0.0f || !(particleDistance < floatMax))
+  {
+    return;
+  }
+  const float coverage = saturate(1.0f - min(particleAttenuation.r, min(particleAttenuation.g, particleAttenuation.b)));
+  if (coverage < cb.particleMotionCoverage)
+  {
+    return;
+  }
+  const vec3 position = origin + direction * particleDistance;
+  const vec3 prevPosition = position - vec3(cb.particleMotionX, cb.particleMotionY, cb.particleMotionZ);
+  const vec2 ndc = cameraPixelCoordinateToNDC(cb.camera, pixelCoordinate);
+  const vec2 motion = cameraCalcMotionVectorPixel(cb.camera, ndc, cameraWorldPosToPrevNDC(cb.camera, prevPosition));
+  const vec4 clip = mul(cb.camera.worldToProjectionJittered, vec4(position, 1.0f));
+  const float depth = clip.z / clip.w;
+  const bool dominates = coverage >= 0.5f;
+  PrimaryScreenSpaceMotionVector[pixelCoordinate] = lerp(PrimaryScreenSpaceMotionVector[pixelCoordinate], motion, coverage);
+  if (dominates)
+  {
+    PrimaryDepth[pixelCoordinate] = depth;
+  }
+  if (GBUFFER_FEATURE_DLSSRR && cb.enableDLSSRR)
+  {
+    PrimaryScreenSpaceMotionVectorDLSSRR[pixelCoordinate] = lerp(PrimaryScreenSpaceMotionVectorDLSSRR[pixelCoordinate], motion, coverage);
+    if (dominates)
+    {
+      PrimaryDepthDLSSRR[pixelCoordinate] = depth;
+    }
+  }
+}
+
 // Returns true when the deferred decal kernel resolves the primary rays' unordered particles (geometryResolverDeferredUnorderedParticles).
 // Returns false in the PSR passes, whose segments are not camera rays.
 bool gbufferDeferUnorderedParticles()
@@ -2040,6 +2078,7 @@ void geometryResolverVertex(
   // resolveVertex adds the hit's own emission to emissiveRadiance, after the unordered particles' emission.
   const vec3 unorderedEmissiveRadiance = emissiveRadiance;
   // The particles' own attenuation (resolveVertex may add a translucent hit's): RBR-RTX anti-ghost coverage below.
+  const vec3 unorderedParticleAttenuation = radianceAttenuation;
   const bool unorderedCovers = numUnorderedInteractions != 0 && cb.particleAntiGhostCoverage > 0.0f &&
     1.0f - min(radianceAttenuation.r, min(radianceAttenuation.g, radianceAttenuation.b)) >= cb.particleAntiGhostCoverage;
 
@@ -2614,6 +2653,11 @@ void geometryResolverVertex(
 
   // The particles (shared bias mask) are using opaque approximations, which only result in monochromatic attenuation, so we just need to output single channel here
   SharedBiasCurrentColorMask[geometryResolverState.pixelCoordinate] = isUnorderedEmissive || unorderedCovers ? 1.0f : 0.0f;
+  if (numUnorderedInteractions != 0 && !geometryResolverState.directionAltered)
+  {
+    rbrParticleMotionVector(uvec2(geometryResolverState.pixelCoordinate), unorderedResolveRay.origin, unorderedResolveRay.direction,
+                            unorderedParticleAttenuation, nearestContributorDistance);
+  }
 
   // Output the Integration Surface PDF
   // Note: This is written out so the integrator can use this as a starting point due to basing itself off this stochastic choice
@@ -3555,6 +3599,8 @@ void geometryResolverDeferredUnorderedParticles(ivec2 pixelCoordinate, bool isMi
   {
     SharedBiasCurrentColorMask[pixelCoordinate] = 1.0f;
   }
+  rbrParticleMotionVector(pixelCoordinate, unorderedResolveRay.origin, unorderedResolveRay.direction, radianceAttenuation,
+                          nearestContributorDistance);
 
   // The atmosphere foreground that geometryResolverVertex keeps in sky mode 1 gets the same transform on its radiance,
   // the nearest particle as a contributor depth, and the hit depth when particles touched a hit pixel.
