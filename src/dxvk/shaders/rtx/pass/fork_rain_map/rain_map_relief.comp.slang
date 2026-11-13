@@ -40,14 +40,9 @@ float loadCovered(int2 texel)
   return value.y - value.x >= cb.wetOcclusionMinHeight ? 1.0f : 0.0f;
 }
 
-// Share of road at a map texel from the host's road mask, bilinear over its cells. 1 without a mask.
-float loadRoad(uint2 texel)
+// Road mask at a position in the map plane, bilinear over its cells.
+float loadRoadAt(vec2 position)
 {
-  if (cb.wetRoadMaskResolution == 0)
-  {
-    return 1.0f;
-  }
-  const vec2 position = vec2(cb.wetMapOriginX, cb.wetMapOriginY) + (vec2(texel) + 0.5f) * cb.wetMapTexel;
   const vec2 t = (position - vec2(cb.wetRoadMaskOriginX, cb.wetRoadMaskOriginY)) / cb.wetRoadMaskCell - 0.5f;
   const vec2 base = floor(t);
   const vec2 f = t - base;
@@ -61,6 +56,29 @@ float loadRoad(uint2 texel)
     road += RainMapRoadMask.Load(int3(coord, 0)) * (offset.x == 0 ? 1.0f - f.x : f.x) * (offset.y == 0 ? 1.0f - f.y : f.y);
   }
   return saturate(road);
+}
+
+// Share of road around a map texel from the host's road mask: a tent over 2 m, so the mask's edge is a gradient
+// a few meters wide and puddles thin out across it. 1 without a mask.
+float loadRoad(uint2 texel)
+{
+  if (cb.wetRoadMaskResolution == 0)
+  {
+    return 1.0f;
+  }
+  const vec2 position = vec2(cb.wetMapOriginX, cb.wetMapOriginY) + (vec2(texel) + 0.5f) * cb.wetMapTexel;
+  float road = 0.0f;
+  float weightSum = 0.0f;
+  for (int dy = -2; dy <= 2; ++dy)
+  {
+    for (int dx = -2; dx <= 2; ++dx)
+    {
+      const float weight = float((3 - abs(dx)) * (3 - abs(dy)));
+      road += loadRoadAt(position + vec2(float(dx), float(dy))) * weight;
+      weightSum += weight;
+    }
+  }
+  return road / weightSum;
 }
 
 [shader("compute")]

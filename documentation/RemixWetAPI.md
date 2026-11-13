@@ -16,6 +16,8 @@ Value: `<originU> <originV> <cellSize> <cells> <hex>`
 | `cells` | Cells per side, 1 to 512. |
 | `hex` | `cells * cells` bits, row by row (V outer, U inner), four cells per hex digit, most significant bit first. 1 = road. |
 
+- The mask's edge is softened over about 2 m: the water level falls across it, so puddles shrink into the deeper hollows
+  and end beyond it. To keep puddles beside the road, mark those cells as road.
 - The mask is read when the rain map is traced (`rtx.wet.puddleQuality` 2). Points outside the mask take its nearest cell.
 - Send it again when the camera has moved far enough that the rain map window (`rtx.wet.mapExtent`) leaves the mask.
 - An empty value removes the mask: puddles form on every wet surface again.

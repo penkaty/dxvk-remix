@@ -443,15 +443,18 @@ void forkApplyWetness(
         const float slopeFade = onMappedGround ? 1.0f - smoothstep(cb.wetSlopeLimit, cb.wetSlopeLimit * (1.0f + cb.wetSlopeFeather), rainMap.w) : 1.0f;
         const float terrain = micro - depression;
 
+        // Away from the road (the host's road mask) the water level falls, so puddles shrink into the deeper hollows
+        // across the mask's edge and end beyond it
+        const float roadFactor = onMappedGround ? saturate(roadShare) : 1.0f;
+
         // The level rises with wetness: -amplitude (dry, nothing under water) to +amplitude at full coverage
-        const float level = cb.wetMicroAmplitude * (2.0f * saturate(cb.wetPuddleCoverage) * wetness - 1.0f);
+        const float level = cb.wetMicroAmplitude * (2.0f * saturate(cb.wetPuddleCoverage) * wetness * roadFactor - 1.0f);
         const float depth = level - terrain;
 
         // 1 on flat ground (the old ramp peaked at 0.55 there, which kept every puddle half transparent)
         const float horizontalFactor = smoothstep(0.95f, 0.98f, originalNormalUp);
-        // Off the road (the host's road mask) the ground stays wet without holding water
-        const float roadFactor = onMappedGround ? smoothstep(0.35f, 0.65f, roadShare) : 1.0f;
-        const float exposure = wetblendBase * horizontalFactor * lerp(1.0f, occlusionFactor, cb.wetPuddleOcclusion) * slopeFade * mapWeight * roadFactor;
+        const float exposure = wetblendBase * horizontalFactor * lerp(1.0f, occlusionFactor, cb.wetPuddleOcclusion) * slopeFade * mapWeight *
+                               smoothstep(0.0f, 0.25f, roadFactor);
 
         puddleAmount = smoothstep(0.0f, cb.wetEdgeWidth, depth) * exposure;
         puddleDepth = max(depth, 0.0f);
