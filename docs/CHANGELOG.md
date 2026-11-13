@@ -32,6 +32,11 @@ Entry format:
 
 The New Vegas RTX runtime is Remix Plus with the additions below, which the Fallout: New Vegas integration uses. The dated entries after this section are the Remix Plus trunk's, and this runtime shares only part of that history. It does not have the trunk's frontend interface rework (interface steps I1 to I6f), the input checks at the scene interface, game lights, external frame export, neural uplift or the stress mode.
 
+### Wet surfaces without puddles
+A second wet texture category takes the wet look (darker, glossier, raindrop rings) without the standing-water layer, so ground beside a road can be wet while puddles stay on the road.
+- Options: added `rtx.wetNoPuddleTextures` (default empty). Preset-independent: it removes work for the listed surfaces.
+- Commits: see the branch history of feat/20261113-wet-no-puddles.
+
 ### World no longer vanishes while the game window is inactive
 With the window inactive, a frame with more scenes than the last presented one was ended early without injection, so a game that keeps presenting with a varying scene count per frame lost its ray traced world and showed only what came after the split. An inactive window now counts as drawing without presenting only after far more scenes than a presented frame has, and any present ends that state.
 - Options: none.

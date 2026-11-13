@@ -405,6 +405,7 @@ namespace dxvk {
     setIf(InstanceCategories::Beam, lookupHash(RtxOptions::beamTextures(), textureHash));
     setIf(InstanceCategories::CardNormals, lookupHash(RtxOptions::cardNormalsTextures(), textureHash));
     setIf(InstanceCategories::Wet, lookupHash(RtxOptions::wetTextures(), textureHash));
+    setIf(InstanceCategories::WetNoPuddles, lookupHash(RtxOptions::wetNoPuddleTextures(), textureHash));
 
     setIf(InstanceCategories::DecalStatic, lookupHash(RtxOptions::decalTextures(), textureHash));
     setIf(InstanceCategories::DecalDynamic, lookupHash(RtxOptions::dynamicDecalTextures(), textureHash));

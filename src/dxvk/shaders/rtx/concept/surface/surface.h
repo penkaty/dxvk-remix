@@ -319,6 +319,13 @@ struct Surface
     set { data0b.z = newValue ? packedFlagSet(data0b.z, 1 << 3) : packedFlagUnset(data0b.z, 1 << 3); }
   }
 
+  // The surface is in rtx.wetNoPuddleTextures: it gets wet, but holds no standing water.
+  property bool wetNoPuddles
+  {
+    get { return packedFlagGet(data0b.z, 1 << 4); }
+    set { data0b.z = newValue ? packedFlagSet(data0b.z, 1 << 4) : packedFlagUnset(data0b.z, 1 << 4); }
+  }
+
   property uint16_t hashPacked
   {
     get { return data0b.w; }

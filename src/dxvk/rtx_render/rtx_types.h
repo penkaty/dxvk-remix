@@ -722,6 +722,7 @@ enum class InstanceCategories : uint32_t {
   HairCards,
   CardNormals, // RBR-RTX (port of xoxor4d e9322b7c): bent normal per hit for flat foliage cards
   Wet,         // RBR-RTX (port of xoxor4d's wetness): surfaces that get rtx.wet.* wetness, puddles and raindrops
+  WetNoPuddles, // Wet surfaces that never hold standing water.
 
   Count,
 };

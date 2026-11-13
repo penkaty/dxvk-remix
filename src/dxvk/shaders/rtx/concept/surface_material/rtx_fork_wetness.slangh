@@ -422,7 +422,7 @@ void forkApplyWetness(
       }
 
       // Standing water on flat, static ground (never on a moving car or a ped): a water level against the ground height
-      if (enablePuddleLayer && cb.wetPuddleQuality > 0 && surface.isStatic && originalNormalUp >= 0.95f && wetness > 0.0f && mapWeight > 0.0f)
+      if (enablePuddleLayer && !surface.wetNoPuddles && cb.wetPuddleQuality > 0 && surface.isStatic && originalNormalUp >= 0.95f && wetness > 0.0f && mapWeight > 0.0f)
       {
         // Small scale unevenness of the ground, two octaves, in world units
         const float noiseFreq = 1.0f / cb.wetNoiseScale;

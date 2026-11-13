@@ -226,7 +226,8 @@ namespace dxvk {
     {"particleemittertextures","Particle Emitters (optional)", &RtxOptions::particleEmitterTexturesObject()},
     {"smoothnormalstextures","Smooth Normals (optional)", &RtxOptions::smoothNormalsTexturesObject()},
     {"cardnormalstextures","Card Normals (optional)", &RtxOptions::cardNormalsTexturesObject()},
-    {"wettextures","Wet Surface Textures (optional)", &RtxOptions::wetTexturesObject()}
+    {"wettextures","Wet Surface Textures (optional)", &RtxOptions::wetTexturesObject()},
+    {"wetnopuddletextures","Wet Surface Without Puddles (optional)", &RtxOptions::wetNoPuddleTexturesObject()}
   };
 
   RemixGui::ComboWithKey<RenderPassGBufferRaytraceMode> renderPassGBufferRaytraceModeCombo {

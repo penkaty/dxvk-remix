@@ -334,6 +334,9 @@ namespace dxvk {
     RTX_OPTION("rtx", fast_unordered_set, wetTextures, {},
                   "Objects rendered with these textures can get wet (road and ground textures): darker and glossier with rtx.wet.globalWetness, puddles in hollows, raindrop ripples. "
                   "Nothing happens while rtx.wet.globalWetness is 0. See rtx.wet.* options.");
+    RTX_OPTION("rtx", fast_unordered_set, wetNoPuddleTextures, {},
+                  "Objects rendered with these textures get wet like the ones in rtx.wetTextures, but never hold standing water (grass, verges, soft ground beside a road). "
+                  "A texture listed here does not need to be in rtx.wetTextures as well.");
     
   public:
     RTX_OPTION("rtx", bool, showRaytracingOption, true, "Enables or disables the option to toggle ray tracing in the UI. When set to false the ray tracing checkbox will not appear in the Remix UI.");

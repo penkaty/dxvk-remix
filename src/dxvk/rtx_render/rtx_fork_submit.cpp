@@ -156,6 +156,7 @@ namespace fork_hooks {
       applyCategory(RtxOptions::beamTextures(), InstanceCategories::Beam);
       applyCategory(RtxOptions::cardNormalsTextures(), InstanceCategories::CardNormals);
       applyCategory(RtxOptions::wetTextures(), InstanceCategories::Wet);
+      applyCategory(RtxOptions::wetNoPuddleTextures(), InstanceCategories::WetNoPuddles);
       applyCategory(RtxOptions::decalTextures(), InstanceCategories::DecalStatic);
       applyCategory(RtxOptions::terrainTextures(), InstanceCategories::Terrain);
       applyCategory(RtxOptions::animatedWaterTextures(), InstanceCategories::AnimatedWater);

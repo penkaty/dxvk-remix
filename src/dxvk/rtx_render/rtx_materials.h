@@ -138,6 +138,7 @@ struct RtSurface {
     flags0 |= isVertexColorBakedLighting ? (1 << 1) : 0;
     flags0 |= useCardNormals ? (1 << 2) : 0;   // RBR-RTX: CardNormals category (surface.h useCardNormals)
     flags0 |= useWet ? (1 << 3) : 0;           // RBR-RTX: Wet category (surface.h useWet)
+    flags0 |= wetNoPuddles ? (1 << 4) : 0;
     // NOTE: Spare flags bits here
 
     writeGPUHelper(data, offset, flags0);
@@ -361,6 +362,7 @@ struct RtSurface {
   bool isVertexColorBakedLighting = true;
   bool useCardNormals = false;           // RBR-RTX: InstanceCategories::CardNormals
   bool useWet = false;                   // RBR-RTX: InstanceCategories::Wet
+  bool wetNoPuddles = false;
   bool isMotionBlurMaskOut = false;
   bool skipSurfaceInteractionSpritesheetAdjustment = false;
 
