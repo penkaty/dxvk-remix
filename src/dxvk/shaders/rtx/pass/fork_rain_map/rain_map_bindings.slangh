@@ -17,3 +17,6 @@ Texture2D<float2> RainMapHeightInput;
 // range marks a texel without geometry.
 layout(binding = RAIN_MAP_BINDING_MAP_OUTPUT, rgba32f)
 RWTexture2D<float4> RainMapOutput;
+
+layout(binding = RAIN_MAP_BINDING_ROAD_MASK)
+Texture2D<float> RainMapRoadMask;

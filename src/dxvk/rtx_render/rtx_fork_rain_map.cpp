@@ -10,6 +10,7 @@
 
 #include "rtx_fork_rain_map.h"
 
+#include "rtx_fork_game_state.h"
 #include "rtx_fork_hooks.h"
 #include "rtx_fork_wetness.h"
 #include "rtx_context.h"
@@ -27,7 +28,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
+#include <string>
+#include <vector>
 
 namespace dxvk {
 
@@ -54,6 +58,7 @@ namespace dxvk {
         COMMON_RAYTRACING_BINDINGS
         TEXTURE2D(RAIN_MAP_BINDING_HEIGHT_INPUT)
         RW_TEXTURE2D(RAIN_MAP_BINDING_MAP_OUTPUT)
+        TEXTURE2D(RAIN_MAP_BINDING_ROAD_MASK)
       END_PARAMETER()
     };
     PREWARM_SHADER_PIPELINE(RainMapReliefShader);
@@ -76,7 +81,78 @@ namespace dxvk {
       Vector3 tracedCamera = Vector3(0.0f);
       float tracedOptions[6] = {};
       uint32_t framesSinceTrace = 0;
+
+      // The host's road mask (game value "__wet.roadMask", documentation/RemixWetAPI.md): one byte per cell, 255 = road.
+      Resources::Resource roadMask;
+      std::string roadMaskValue;
+      std::vector<uint8_t> roadMaskCells;
+      uint32_t roadMaskResolution = 0;
+      uint32_t roadMaskImageResolution = 0;
+      float roadMaskOriginU = 0.0f;
+      float roadMaskOriginV = 0.0f;
+      float roadMaskCell = 1.0f;
+      bool roadMaskDirty = false;
     };
+
+    constexpr uint32_t kMaxRoadMaskResolution = 512;
+
+    // Reads "__wet.roadMask" = "<originU> <originV> <cellSize> <cells per side> <hex digits, 4 cells each, row by row>".
+    // An empty or malformed value means no mask.
+    void readRoadMask(State& s) {
+      std::string value;
+      fork_game_state::GameStateStore::get().tryGet("__wet.roadMask", value);
+      if (value == s.roadMaskValue) {
+        return;
+      }
+      s.roadMaskValue = value;
+      s.roadMaskResolution = 0;
+      s.traced = false;
+
+      float originU = 0.0f;
+      float originV = 0.0f;
+      float cell = 0.0f;
+      unsigned resolution = 0;
+      int consumed = 0;
+      if (sscanf(value.c_str(), "%f %f %f %u %n", &originU, &originV, &cell, &resolution, &consumed) < 4 ||
+          cell <= 0.0f || resolution == 0 || resolution > kMaxRoadMaskResolution) {
+        return;
+      }
+      const size_t cells = size_t(resolution) * resolution;
+      const size_t digits = (cells + 3) / 4;
+      if (value.size() < size_t(consumed) + digits) {
+        return;
+      }
+      s.roadMaskCells.assign(cells, 0);
+      for (size_t i = 0; i < cells; ++i) {
+        const char c = value[size_t(consumed) + i / 4];
+        const int digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : 0;
+        s.roadMaskCells[i] = (digit >> (3 - int(i % 4))) & 1 ? 255 : 0;
+      }
+      s.roadMaskOriginU = originU;
+      s.roadMaskOriginV = originV;
+      s.roadMaskCell = cell;
+      s.roadMaskResolution = resolution;
+      s.roadMaskDirty = true;
+    }
+
+    // The mask image always exists for the relief pass's binding: one cell while the host sends none.
+    void uploadRoadMask(RtxContext& ctx, State& s) {
+      const uint32_t res = std::max(s.roadMaskResolution, 1u);
+      Rc<DxvkContext> dctx = &ctx;
+      if (!s.roadMask.isValid() || s.roadMaskImageResolution != res) {
+        s.roadMask = Resources::createImageResource(dctx, "Fork Rain Map Road Mask", VkExtent3D { res, res, 1 }, VK_FORMAT_R8_UNORM);
+        s.roadMaskImageResolution = res;
+        s.roadMaskDirty = true;
+      }
+      if (!s.roadMaskDirty) {
+        return;
+      }
+      s.roadMaskDirty = false;
+      const uint8_t road = 255;
+      const uint8_t* data = s.roadMaskResolution ? s.roadMaskCells.data() : &road;
+      ctx.updateImage(s.roadMask.image, VkImageSubresourceLayers { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, VkOffset3D { 0, 0, 0 },
+                      VkExtent3D { res, res, 1 }, const_cast<uint8_t*>(data), res, res * res);
+    }
 
     // A map that has not been traced for this long is traced again, for geometry that streamed in around a still camera.
     constexpr uint32_t kMaxFramesBetweenTraces = 60;
@@ -111,6 +187,9 @@ namespace dxvk {
     State& s = state();
     // Only while something can be wet: no wetness, no map, no pass
     s.enabled = WetnessOptions::puddleQuality() >= 2 && WetnessOptions::globalWetness() > 0.0f;
+    if (s.enabled) {
+      readRoadMask(s);
+    }
 
     const uint32_t res = requestedResolution();
     const float extent = std::max(WetnessOptions::mapExtent(), 8.0f);
@@ -150,6 +229,10 @@ namespace dxvk {
     constants.wetMapTexel = texel;
     constants.wetMapTraceTop = s.traceTop;
     constants.wetMapTraceBottom = s.traceBottom;
+    constants.wetRoadMaskOriginX = s.roadMaskOriginU;
+    constants.wetRoadMaskOriginY = s.roadMaskOriginV;
+    constants.wetRoadMaskCell = s.roadMaskCell;
+    constants.wetRoadMaskResolution = s.roadMaskResolution;
   }
 
   void ForkRainMap::dispatch(RtxContext& ctx, const Resources::RaytracingOutput& rtOutput) {
@@ -162,6 +245,7 @@ namespace dxvk {
       return;
     }
     ensureResources(ctx);
+    uploadRoadMask(ctx, s);
 
     ScopedGpuProfileZone(&ctx, "Fork Rain Map");
 
@@ -178,6 +262,8 @@ namespace dxvk {
 
     ctx.bindResourceView(RAIN_MAP_BINDING_HEIGHT_INPUT, s.height.view, nullptr);
     ctx.bindResourceView(RAIN_MAP_BINDING_MAP_OUTPUT, s.map.view, nullptr);
+    ctx.bindResourceView(RAIN_MAP_BINDING_ROAD_MASK, s.roadMask.view, nullptr);
+    ctx.getCommandList()->trackResource<DxvkAccess::Read>(s.roadMask.image);
     ctx.getCommandList()->trackResource<DxvkAccess::Read>(s.height.image);
     ctx.getCommandList()->trackResource<DxvkAccess::Write>(s.map.image);
     ctx.bindShader(VK_SHADER_STAGE_COMPUTE_BIT, RainMapReliefShader::getShader());

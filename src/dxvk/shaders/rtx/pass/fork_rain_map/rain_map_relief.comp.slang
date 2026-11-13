@@ -40,6 +40,29 @@ float loadCovered(int2 texel)
   return value.y - value.x >= cb.wetOcclusionMinHeight ? 1.0f : 0.0f;
 }
 
+// Share of road at a map texel from the host's road mask, bilinear over its cells. 1 without a mask.
+float loadRoad(uint2 texel)
+{
+  if (cb.wetRoadMaskResolution == 0)
+  {
+    return 1.0f;
+  }
+  const vec2 position = vec2(cb.wetMapOriginX, cb.wetMapOriginY) + (vec2(texel) + 0.5f) * cb.wetMapTexel;
+  const vec2 t = (position - vec2(cb.wetRoadMaskOriginX, cb.wetRoadMaskOriginY)) / cb.wetRoadMaskCell - 0.5f;
+  const vec2 base = floor(t);
+  const vec2 f = t - base;
+  const int last = int(cb.wetRoadMaskResolution) - 1;
+  float road = 0.0f;
+  [unroll]
+  for (int i = 0; i < 4; ++i)
+  {
+    const int2 offset = int2(i & 1, i >> 1);
+    const int2 coord = clamp(int2(base) + offset, int2(0, 0), int2(last, last));
+    road += RainMapRoadMask.Load(int3(coord, 0)) * (offset.x == 0 ? 1.0f - f.x : f.x) * (offset.y == 0 ? 1.0f - f.y : f.y);
+  }
+  return saturate(road);
+}
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void main(uint2 threadId : SV_DispatchThreadID)
@@ -113,5 +136,7 @@ void main(uint2 threadId : SV_DispatchThreadID)
   }
   const float coverage = coverWeight > 0.0f ? coverSum / coverWeight : 0.0f;
 
-  RainMapOutput[threadId] = float4(coverage, height, depression, length(vec2(gx, gy)));
+  // w carries two values: the slope (below 4) plus 4 x the road share in 255 steps (forkWetnessRainMapFetch splits them)
+  const float slope = min(length(vec2(gx, gy)), 3.99f);
+  RainMapOutput[threadId] = float4(coverage, height, depression, slope + 4.0f * floor(loadRoad(threadId) * 255.0f + 0.5f));
 }

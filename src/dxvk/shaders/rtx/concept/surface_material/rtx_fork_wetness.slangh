@@ -87,7 +87,8 @@ vec4 forkWetnessNoise4(vec2 xy, float scale, float slice)
 
 // Bilinear fetch of the map by hand (no sampler is bound for it): texels without geometry are left out of the blend, the
 // result is the weighted mean of the valid ones, or a miss (y below the trace range) when none is.
-vec4 forkWetnessRainMapFetch(vec2 uv)
+// `road` is the share of road at that point (the host's road mask, 1 without one): standing water forms on road only.
+vec4 forkWetnessRainMapFetch(vec2 uv, out float road)
 {
   const int last = int(cb.wetMapResolution) - 1;
   const vec2 t = uv * float(cb.wetMapResolution) - 0.5f;
@@ -95,25 +96,31 @@ vec4 forkWetnessRainMapFetch(vec2 uv)
   const vec2 f = t - base;
   vec4 sum = vec4(0.0f);
   float weightSum = 0.0f;
+  float roadSum = 0.0f;
   [unroll]
   for (int i = 0; i < 4; ++i)
   {
     const int2 offset = int2(i & 1, i >> 1);
     const int2 coord = clamp(int2(base) + offset, int2(0, 0), int2(last, last));
-    const vec4 v = ForkRainMap.Load(int3(coord, 0));
+    vec4 v = ForkRainMap.Load(int3(coord, 0));
     const float w = (offset.x == 0 ? 1.0f - f.x : f.x) * (offset.y == 0 ? 1.0f - f.y : f.y) * (v.y > cb.wetMapTraceBottom - 0.5f ? 1.0f : 0.0f);
+    const float packedRoad = floor(v.w * 0.25f);
+    v.w -= packedRoad * 4.0f;
+    roadSum += packedRoad * (1.0f / 255.0f) * w;
     sum += v * w;
     weightSum += w;
   }
+  road = weightSum > 0.0f ? roadSum / weightSum : 1.0f;
   return weightSum > 0.0f ? sum / weightSum : vec4(0.0f, cb.wetMapTraceBottom - 1.0f, 0.0f, 0.0f);
 }
 
 // Rain map at a world position (given by its plane coordinates): x rain cover (0 exposed .. 1 covered, blurred over
 // the feather radius), y ground height (up axis), z depression of the ground, w slope of the ground. `weight` is 1
 // inside the map, fades to 0 over its outer fifth, and is 0 where the map found nothing or when the map is off.
-vec4 forkWetnessRainMap(vec2 xy, out float weight)
+vec4 forkWetnessRainMap(vec2 xy, out float weight, out float road)
 {
   weight = 0.0f;
+  road = 1.0f;
   if (cb.wetPuddleQuality < 2)
   {
     return vec4(0.0f);
@@ -126,7 +133,7 @@ vec4 forkWetnessRainMap(vec2 xy, out float weight)
   {
     return vec4(0.0f);
   }
-  const vec4 value = forkWetnessRainMapFetch(uv);
+  const vec4 value = forkWetnessRainMapFetch(uv, road);
   weight = value.y > cb.wetMapTraceBottom - 0.5f ? fade : 0.0f;
   return value;
 }
@@ -368,7 +375,8 @@ void forkApplyWetness(
     const float positionHeight = forkWetHeight(surfaceInteraction.position);
 
     float rainMapWeight;
-    const vec4 rainMap = forkWetnessRainMap(xy, rainMapWeight);
+    float roadShare;
+    const vec4 rainMap = forkWetnessRainMap(xy, rainMapWeight, roadShare);
     const bool hasMap = rainMapWeight > 0.5f;
     // The relief belongs to the mapped ground; a point well above it (a bridge deck over a street) gets none
     const bool onMappedGround = hasMap && abs(rainMap.y - positionHeight) < 0.5f;
@@ -441,7 +449,9 @@ void forkApplyWetness(
 
         // 1 on flat ground (the old ramp peaked at 0.55 there, which kept every puddle half transparent)
         const float horizontalFactor = smoothstep(0.95f, 0.98f, originalNormalUp);
-        const float exposure = wetblendBase * horizontalFactor * lerp(1.0f, occlusionFactor, cb.wetPuddleOcclusion) * slopeFade * mapWeight;
+        // Off the road (the host's road mask) the ground stays wet without holding water
+        const float roadFactor = onMappedGround ? smoothstep(0.35f, 0.65f, roadShare) : 1.0f;
+        const float exposure = wetblendBase * horizontalFactor * lerp(1.0f, occlusionFactor, cb.wetPuddleOcclusion) * slopeFade * mapWeight * roadFactor;
 
         puddleAmount = smoothstep(0.0f, cb.wetEdgeWidth, depth) * exposure;
         puddleDepth = max(depth, 0.0f);

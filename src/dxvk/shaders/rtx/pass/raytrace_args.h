@@ -617,6 +617,11 @@ struct RaytraceArgs {
   float wetMapTexel;
   float wetMapTraceTop;
   float wetMapTraceBottom;
+  // The host's road mask (rtx_fork_rain_map.cpp): cell (0, 0) corner in the map plane, cell size, cells per side (0 = none).
+  float wetRoadMaskOriginX;
+  float wetRoadMaskOriginY;
+  float wetRoadMaskCell;
+  uint wetRoadMaskResolution;
   float wetRaindropDensity;
   // RBR-RTX: the world displacement over the last frame of the falling particles (rtx.particles.motionVectorVelocity x frame
   // time), for their motion vectors below. (Were wetPad0-2.)

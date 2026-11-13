@@ -739,6 +739,7 @@ independently of the typed C API.
 | :-- | :-- | :-- |
 | `__weather.*`, `__sky.*` | `SetGameValue` / `GetGameValue` | [`RemixSkyAPI.md`](RemixSkyAPI.md) |
 | `rtx.weather.preset.*` | `SetConfigVariable` | [`RemixSkyAPI.md`](RemixSkyAPI.md) |
+| `__wet.*` | `SetGameValue` | [`RemixWetAPI.md`](../documentation/RemixWetAPI.md) |
 
 When a new fork-side subsystem starts publishing a `__<ns>.*`
 GameStateStore convention or a `rtx.<ns>.*` ConfigVariable namespace
