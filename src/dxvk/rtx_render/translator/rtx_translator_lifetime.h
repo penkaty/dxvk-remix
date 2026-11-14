@@ -91,8 +91,18 @@ namespace dxvk {
         return boundingBoxIntersectsFrustum(camera.getFrustum(), aabb.minPos, aabb.maxPos, objectToView);
       }
 
+      // Returns how many frames an object stays alive without a draw.
+      // Returns at most 1 for particles: their geometry is new every frame, so a kept object would show
+      // the particles a second time where they were in an earlier frame.
+      static uint32_t framesToKeep(uint32_t categories, const LifetimeFrame& frame) {
+        if (CategoryFlags(categories).test(InstanceCategories::Particle)) {
+          return (std::min)(1u, frame.framesToKeepObjects);
+        }
+        return frame.framesToKeepObjects;
+      }
+
       static bool isStale(const UnseenObject& object, const LifetimeFrame& frame) {
-        return object.frameLastSeen + frame.framesToKeepObjects <= frame.currentFrame;
+        return object.frameLastSeen + framesToKeep(object.categories, frame) <= frame.currentFrame;
       }
 
       // For a stale object: true = keep it (anti-culling), false = collect it.
@@ -108,9 +118,11 @@ namespace dxvk {
 
         // Skinned and player model objects are always collected when stale (anti-culling them freezes poses), as are
         // objects tagged IgnoreAntiCulling and objects that were moving when last seen (they would freeze mid-motion).
+        // Particles are collected too, because a kept particle object is a frozen copy of the particles.
         const CategoryFlags categories(object.categories);
         const bool exempt =
           object.skinned ||
+          categories.test(InstanceCategories::Particle) ||
           categories.test(InstanceCategories::ThirdPersonPlayerModel) ||
           categories.test(InstanceCategories::IgnoreAntiCulling) ||
           object.wasMovingWhenLastSeen;
