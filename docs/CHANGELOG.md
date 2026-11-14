@@ -38,6 +38,11 @@ A host can say where the road is with the game value `__wet.roadMask` (a bit gri
 - Commits: see the branch history of feat/20261113-wet-no-puddles.
 - Docs: [RemixWetAPI.md](../documentation/RemixWetAPI.md)
 
+### Particles are not kept past their frame
+A particle object (category Particle) lives at most one frame without a draw and is never anti-culled. Particle geometry is new every frame, so with `rtx.numFramesToKeepInstances` above 1 the kept objects of earlier frames showed every snowflake and raindrop again where it had been, as a stack of copies a frame's fall apart.
+- Options: none. Other objects keep `rtx.numFramesToKeepInstances` as before.
+- Commits: see the branch history of feat/20261114-particle-lifetime.
+
 ### Wet surfaces without puddles
 A second wet texture category takes the wet look (darker, glossier, raindrop rings) without the standing-water layer, so ground beside a road can be wet while puddles stay on the road.
 - Options: added `rtx.wetNoPuddleTextures` (default empty). Preset-independent: it removes work for the listed surfaces.

@@ -530,7 +530,6 @@ namespace dxvk {
     translator::LifetimeFrame lifetime = lifetimeIn;
     lifetime.currentFrame = currentFrame;
     lifetime.forceCollect = forceGC;
-    const uint32_t numFramesToKeepObjects = lifetime.framesToKeepObjects;
 
     // rtx.parallelScenePrepScans: the stale replacement instances are found on worker threads, and the
     // loop below then only reads their flags. The flags move with the instances when the loop swap-removes one.
@@ -547,7 +546,7 @@ namespace dxvk {
             _mm_prefetch(reinterpret_cast<const char*>(&m_replacementInstances[i + 8]->frameLastSeen), _MM_HINT_T0);
           }
           const ReplacementInstance& ri = *m_replacementInstances[i];
-          stale[i] = (ri.frameLastSeen + numFramesToKeepObjects <= currentFrame ||
+          stale[i] = (ri.frameLastSeen + translator::LifetimePolicy::framesToKeep(ri.categoryFlags, lifetime) <= currentFrame ||
                       (ri.handedToScene && ri.frameLastSeen < currentFrame)) ? 1 : 0;
         }
       });
@@ -562,7 +561,8 @@ namespace dxvk {
 
       // An instance whose object the scene took over goes in the first frame without a draw.
       const bool handedToScene = replacementInstance->handedToScene && replacementInstance->frameLastSeen < currentFrame;
-      if (replacementInstance->frameLastSeen + numFramesToKeepObjects <= currentFrame || handedToScene) {
+      if (replacementInstance->frameLastSeen + translator::LifetimePolicy::framesToKeep(replacementInstance->categoryFlags, lifetime) <= currentFrame ||
+          handedToScene) {
         // translator::LifetimePolicy (shared with the scene's transient lane).
         translator::UnseenObject unseen;
         unseen.frameLastSeen = replacementInstance->frameLastSeen;
