@@ -101,9 +101,20 @@ namespace dxvk {
       ImGui::SetTooltip("%s", kLicenseUrl);
     }
 
-    if (!ImGUI::donateUrl().empty()) {
-      ImGui::Spacing();
-      ImGUI::showDonateButton();
+    const std::string& releaseLicense = ImGUI::projectLicenseUrl();
+    if (releaseLicense.rfind("https://", 0) == 0) {
+      ImGui::SameLine();
+      if (ImGui::SmallButton(ImGUI::projectLicenseLabel().c_str())) {
+        env::openUrlInBrowser(releaseLicense.c_str());
+      }
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", releaseLicense.c_str());
+      }
+    }
+
+    if (ImGUI::hasDonateLink()) {
+      ImGui::SameLine();
+      ImGUI::showSmallDonateButton();
     }
 
     ImGui::Spacing();

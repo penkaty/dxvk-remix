@@ -302,6 +302,10 @@ namespace dxvk {
                "A game's rtx.conf can set it to the name of its RTX release.");
     RTX_OPTION("rtx.gui", std::string, donateUrl, std::string(""),
                "A link the welcome window, the About tab and the top of the user graphics menu show as a Donate button. Empty hides the button. Only https links are opened.");
+    RTX_OPTION("rtx.gui", std::string, projectLicenseUrl, std::string(""),
+               "A link to the licence of the game's RTX release. The welcome window shows it as a second licence button next to the Remix one. Empty hides the button. Only https links are opened.");
+    RTX_OPTION("rtx.gui", std::string, projectLicenseLabel, std::string("Project License"),
+               "The text of the button rtx.gui.projectLicenseUrl adds to the welcome window, such as the release's name followed by License.");
     RTX_OPTION("rtx.gui", std::string, logHelpText, std::string(""),
                "The instructions the log section of the menus shows above the log folder, such as which file to send with a bug report and where to send it.\n"
                "Empty shows a short generic instruction.");
@@ -320,6 +324,8 @@ namespace dxvk {
     // Draws the Donate line: the text and a small button on one line by default.
     // With a buttonSize width above 0, the text is centred above a button of that size.
     public: static void showDonateButton(const ImVec2& buttonSize = ImVec2(0.0f, 0.0f));
+    // Draws a small gold DONATE button with no text before it, for a row of buttons.
+    public: static void showSmallDonateButton();
     
     public: static void onThemeChange(DxvkDevice* device);
     public: static void onBackgroundAlphaChange(DxvkDevice* device);
