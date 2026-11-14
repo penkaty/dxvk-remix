@@ -32,6 +32,11 @@ Entry format:
 
 The New Vegas RTX runtime is Remix Plus with the additions below, which the Fallout: New Vegas integration uses. The dated entries after this section are the Remix Plus trunk's, and this runtime shares only part of that history. It does not have the trunk's frontend interface rework (interface steps I1 to I6f), the input checks at the scene interface, game lights, external frame export, neural uplift or the stress mode.
 
+### Release licence and donate buttons in the welcome window
+The welcome window can show a second licence button for the game's RTX release, next to the Remix licence button. When `rtx.gui.donateUrl` is set, a gold DONATE button sits on the same line instead of the donate line below it.
+- Options: added `rtx.gui.projectLicenseUrl` (default empty, hides the button) and `rtx.gui.projectLicenseLabel` (default "Project License").
+- Commits: see the branch history of feat/20261114-welcome-links.
+
 ### Road mask for puddles
 A host can say where the road is with the game value `__wet.roadMask` (a bit grid in the ground plane). Puddles then form only there, and the rest of the wet ground keeps its wet look. One texture often covers road and verge, so a texture list cannot make that split.
 - Options: none. Without the game value nothing changes.

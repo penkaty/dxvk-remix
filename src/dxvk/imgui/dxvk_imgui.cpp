@@ -4069,6 +4069,25 @@ namespace dxvk {
     }
   }
 
+  // Draws nothing when rtx.gui.donateUrl holds no https link.
+  void ImGUI::showSmallDonateButton() {
+    if (!hasDonateLink()) {
+      return;
+    }
+    const std::string& url = donateUrl();
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.65f, 0.13f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.95f, 0.76f, 0.22f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.72f, 0.54f, 0.10f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.10f, 0.07f, 0.0f, 1.0f));
+    if (ImGui::SmallButton("DONATE")) {
+      env::openUrlInBrowser(url.c_str());
+    }
+    ImGui::PopStyleColor(4);
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("%s", url.c_str());
+    }
+  }
+
   void ImGUI::onThemeChange(DxvkDevice* device) {
     if (GImGui != nullptr) {
       ImGUI& gui = device->getCommon()->getImgui();
